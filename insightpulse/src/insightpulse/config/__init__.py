@@ -5,6 +5,6 @@ environment variables. The active profile is determined by the ENV
 environment variable (demo | production | test).
 """
 
-from insightpulse.config.settings import get_settings, Settings
+from insightpulse.config.settings import Settings, get_settings
 
-__all__ = ["get_settings", "Settings"]
+__all__ = ["Settings", "get_settings"]

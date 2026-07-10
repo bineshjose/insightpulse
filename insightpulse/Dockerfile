@@ -19,9 +19,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency specification and install
-COPY pyproject.toml .
-RUN pip install --no-cache-dir --prefix=/install .
+# CPU-only torch first: the default PyPI wheel drags in the multi-GB CUDA
+# stack, which a demo container never uses.
+RUN pip install --no-cache-dir --prefix=/install \
+    torch --index-url https://download.pytorch.org/whl/cpu
+
+# Copy dependency specification AND sources — hatchling cannot build the
+# wheel from pyproject.toml alone (packages = ["src/insightpulse"], and the
+# declared readme must exist for metadata).
+COPY pyproject.toml README.md ./
+COPY src/ src/
+RUN PYTHONPATH=/install/lib/python3.11/site-packages \
+    pip install --no-cache-dir --prefix=/install .
 
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime — slim image with only runtime dependencies

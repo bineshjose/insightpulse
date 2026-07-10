@@ -14,16 +14,15 @@ Corresponds to:
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Enumerations for demographic attributes
 # ---------------------------------------------------------------------------
 
-class AgeGroup(str, Enum):
+class AgeGroup(StrEnum):
     """Age group classification matching NIQ panel structure."""
 
     AGE_18_24 = "18-24"
@@ -34,7 +33,7 @@ class AgeGroup(str, Enum):
     AGE_65_PLUS = "65+"
 
 
-class IncomeGroup(str, Enum):
+class IncomeGroup(StrEnum):
     """Household income brackets."""
 
     LOW = "low"
@@ -44,7 +43,7 @@ class IncomeGroup(str, Enum):
     HIGH = "high"
 
 
-class Region(str, Enum):
+class Region(StrEnum):
     """Geographic region classification."""
 
     NORTHEAST = "northeast"
@@ -56,7 +55,7 @@ class Region(str, Enum):
     RURAL = "rural"
 
 
-class HouseholdSize(str, Enum):
+class HouseholdSize(StrEnum):
     """Household size categories."""
 
     SINGLE = "1"

@@ -126,9 +126,15 @@ def _build_distribution(
 
     counts = {opt: 0 for opt in options}
     total = len(responses)
+    by_lowered = {opt.lower().strip(): opt for opt in options}
 
     for resp in responses:
         answer = resp.get("answer", "").strip().lower()
+        # Exact match wins; substring fallback would otherwise misassign
+        # (e.g., "agree" is a substring of "disagree").
+        if answer in by_lowered:
+            counts[by_lowered[answer]] += 1
+            continue
         for opt in options:
             if opt.lower() in answer or answer in opt.lower():
                 counts[opt] += 1

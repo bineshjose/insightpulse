@@ -2,20 +2,17 @@
 
 from datetime import date
 
-import pytest
-
+from insightpulse.models.calibration import CalibrationMetrics
+from insightpulse.models.embedding import ClusterAssignment, ConditioningVector
 from insightpulse.models.panelist import (
     AgeGroup,
     DemographicProfile,
-    Household,
+    HouseholdSize,
     IncomeGroup,
     PurchaseRecord,
     Region,
-    HouseholdSize,
 )
 from insightpulse.models.survey import QuestionType, SurveyQuestion
-from insightpulse.models.embedding import ClusterAssignment, ConditioningVector
-from insightpulse.models.calibration import CalibrationMetrics
 
 
 class TestDemographicProfile:

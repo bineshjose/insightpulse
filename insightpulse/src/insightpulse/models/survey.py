@@ -8,17 +8,16 @@ results with calibration and validation metrics.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Question Types
 # ---------------------------------------------------------------------------
 
-class QuestionType(str, Enum):
+class QuestionType(StrEnum):
     """Supported survey question types.
 
     Each type determines how the LLM is prompted and how responses

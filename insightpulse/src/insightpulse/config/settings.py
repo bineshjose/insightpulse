@@ -13,7 +13,7 @@ environments with zero code changes — only configuration differs.
 from __future__ import annotations
 
 import functools
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -21,12 +21,11 @@ import yaml
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 # ---------------------------------------------------------------------------
 # Enumerations
 # ---------------------------------------------------------------------------
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Supported deployment environments."""
 
     DEMO = "demo"
@@ -34,7 +33,7 @@ class Environment(str, Enum):
     TEST = "test"
 
 
-class DataSource(str, Enum):
+class DataSource(StrEnum):
     """Where panelist data is loaded from."""
 
     SYNTHETIC = "synthetic"   # Generated sample data (demo)
@@ -42,7 +41,7 @@ class DataSource(str, Enum):
     API = "api"               # NIQ data API (production)
 
 
-class CacheBackend(str, Enum):
+class CacheBackend(StrEnum):
     """Caching strategy."""
 
     MEMORY = "memory"   # In-process dict (demo/test)

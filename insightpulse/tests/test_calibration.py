@@ -8,12 +8,11 @@ Verifies that the calibration algorithm:
 """
 
 import numpy as np
-import pytest
 
 from insightpulse.agents.calibration_agent import (
+    _compute_calibration_metrics,
     _compute_distribution,
     _sinkhorn_calibrate,
-    _compute_calibration_metrics,
 )
 
 
@@ -35,7 +34,7 @@ class TestSinkhornCalibration:
         source = np.array([0.6, 0.1, 0.1, 0.1, 0.1])  # Very skewed
         target = np.array([0.2, 0.2, 0.2, 0.2, 0.2])   # Uniform
 
-        calibrated, info = _sinkhorn_calibrate(source, target, lambda_b=0.0)
+        calibrated, _info = _sinkhorn_calibrate(source, target, lambda_b=0.0)
 
         # The calibrated distribution should be closer to target than source
         source_distance = np.sum(np.abs(source - target))

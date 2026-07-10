@@ -8,6 +8,8 @@ These models represent the output of L2 (Feature Engineering & Embedding Layer):
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pydantic import BaseModel, Field
 
 
@@ -66,8 +68,9 @@ class ClusterAssignment(BaseModel):
         description="Silhouette score measuring cluster membership quality",
     )
 
-    # Default cluster labels matching thesis results
-    CLUSTER_LABELS: dict[int, str] = {
+    # Default cluster labels matching thesis results. ClassVar keeps this a
+    # class constant — without it Pydantic v2 would treat it as a model field.
+    CLUSTER_LABELS: ClassVar[dict[int, str]] = {
         0: "price_sensitive",
         1: "premium_loyalist",
         2: "category_explorer",

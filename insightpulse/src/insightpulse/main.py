@@ -187,7 +187,7 @@ async def run_survey(request: SurveyRequest) -> SurveyRunResponse:
 
     except Exception as e:
         logger.error("survey_pipeline_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {e!s}") from e
 
 
 @app.get("/api/v1/config")

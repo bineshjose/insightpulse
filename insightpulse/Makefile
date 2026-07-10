@@ -19,6 +19,8 @@ help: ## Show this help message
 demo: ## Start the demo environment (Docker Desktop)
 	@echo "🚀 Starting InsightPulse in demo mode..."
 	@cp -n .env.example .env 2>/dev/null || true
+	@test -f data/synthetic/panelists.csv || \
+		echo "⚠  Sample data missing — run 'make generate-data' first for full demo functionality."
 	docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
 
 demo-detached: ## Start demo in background

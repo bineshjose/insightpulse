@@ -132,11 +132,17 @@ def _compute_distribution(
         Normalized probability distribution as numpy array.
     """
     counts = np.zeros(len(options))
+    lowered = [opt.lower().strip() for opt in options]
 
     for resp in responses:
         answer = resp.get("answer", "").lower().strip()
-        for i, option in enumerate(options):
-            if option.lower().strip() in answer or answer in option.lower().strip():
+        # Exact match wins; substring fallback would otherwise misassign
+        # (e.g., "agree" is a substring of "disagree").
+        if answer in lowered:
+            counts[lowered.index(answer)] += 1
+            continue
+        for i, option in enumerate(lowered):
+            if option in answer or answer in option:
                 counts[i] += 1
                 break
 
@@ -208,7 +214,7 @@ def _sinkhorn_calibrate(
     cost_matrix = cost_matrix.astype(float) / cost_matrix.max()
 
     # Gibbs kernel
-    K = np.exp(-cost_matrix / epsilon)
+    kernel = np.exp(-cost_matrix / epsilon)
 
     # Initialize scaling vectors
     u = np.ones(n)
@@ -217,12 +223,12 @@ def _sinkhorn_calibrate(
     convergence_history: list[float] = []
     converged = False
 
-    for iteration in range(max_iter):
+    for _iteration in range(max_iter):
         u_prev = u.copy()
 
         # Sinkhorn iterations
-        u = source / (K @ v + 1e-16)
-        v = target / (K.T @ u + 1e-16)
+        u = source / (kernel @ v + 1e-16)
+        v = target / (kernel.T @ u + 1e-16)
 
         # Check convergence
         error = float(np.max(np.abs(u - u_prev)))
@@ -233,7 +239,7 @@ def _sinkhorn_calibrate(
             break
 
     # Compute the transport plan
-    transport_plan = np.diag(u) @ K @ np.diag(v)
+    transport_plan = np.diag(u) @ kernel @ np.diag(v)
 
     # The calibrated distribution is the column marginal of the transport plan
     calibrated = transport_plan.sum(axis=0)
@@ -250,6 +256,10 @@ def _sinkhorn_calibrate(
         "iterations_used": len(convergence_history),
         "final_error": convergence_history[-1] if convergence_history else 0.0,
         "convergence_history": convergence_history,
+        # The plan itself is needed by analyses that study HOW mass moves
+        # (e.g., the calibration_convergence experiment's sharpness metric);
+        # it is not serialized into pipeline state.
+        "transport_plan": transport_plan,
     }
 
     return calibrated, convergence_info

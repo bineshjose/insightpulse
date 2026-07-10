@@ -19,8 +19,6 @@ from typing import Any
 
 import structlog
 
-from insightpulse.config.settings import get_settings
-
 logger = structlog.get_logger(__name__)
 
 
@@ -38,7 +36,6 @@ async def validator_node(state: dict[str, Any]) -> dict[str, Any]:
         State updates with validation results.
     """
     start_time = time.perf_counter()
-    settings = get_settings()
 
     raw_responses = state.get("raw_responses", [])
     questions = state.get("parsed_questions", [])
@@ -120,7 +117,6 @@ def _validate_response(
         List of validation flag strings (empty = passed all checks).
     """
     flags: list[str] = []
-    settings = get_settings()
 
     answer = response.get("answer", "").strip()
 
@@ -129,9 +125,12 @@ def _validate_response(
         return flags
 
     # Check 1: Option validity (for choice-based questions)
-    if question and question.get("options"):
-        if not _is_valid_option(answer, question["options"]):
-            flags.append("invalid_option")
+    if (
+        question
+        and question.get("options")
+        and not _is_valid_option(answer, question["options"])
+    ):
+        flags.append("invalid_option")
 
     # Check 2: Confidence threshold
     confidence = response.get("confidence", 0.5)
@@ -179,9 +178,12 @@ def _is_valid_option(answer: str, options: list[str]) -> bool:
         if option_lower in answer_lower or answer_lower in option_lower:
             return True
         # Numeric match for Likert/NPS
-        if answer_lower.isdigit() and option_lower.isdigit():
-            if int(answer_lower) == int(option_lower):
-                return True
+        if (
+            answer_lower.isdigit()
+            and option_lower.isdigit()
+            and int(answer_lower) == int(option_lower)
+        ):
+            return True
 
     return False
 

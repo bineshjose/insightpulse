@@ -37,3 +37,6 @@ Thumbs.db
 # Terraform
 terraform/.terraform/
 terraform/*.tfstate*
+
+# Experiment outputs (regenerate with make experiments)
+experiments/results/

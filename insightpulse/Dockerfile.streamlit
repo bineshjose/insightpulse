@@ -10,10 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
+# CPU-only torch first: the default PyPI wheel drags in the multi-GB CUDA
+# stack, which the dashboard never uses.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# pyproject.toml AND sources — hatchling cannot build the wheel from
+# pyproject.toml alone (packages = ["src/insightpulse"], and the declared
+# readme must exist for metadata).
+COPY pyproject.toml README.md ./
+COPY src/ /app/src/
 RUN pip install --no-cache-dir .
 
-COPY src/ /app/src/
 COPY dashboard/ /app/dashboard/
 COPY config/ /app/config/
 COPY data/ /app/data/

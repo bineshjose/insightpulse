@@ -124,7 +124,6 @@ def _load_synthetic_panelists() -> list[dict[str, Any]]:
         List of panelist dictionaries.
     """
     import pandas as pd
-    from pathlib import Path
 
     settings = get_settings()
     panelist_file = settings.synthetic_data_dir / "panelists.csv"
@@ -234,7 +233,7 @@ def _stratified_sample(
 
     # Sample proportionally from each cluster
     selected: list[dict] = []
-    for cluster_id, members in cluster_groups.items():
+    for members in cluster_groups.values():
         proportion = len(members) / len(panelists)
         n_from_cluster = max(1, int(target_size * proportion))
         n_from_cluster = min(n_from_cluster, len(members))

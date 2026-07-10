@@ -33,12 +33,15 @@ SURVEY_DESIGNER_SYSTEM_PROMPT = """You are a survey science expert at NielsenIQ.
 Your task is to take a raw survey question and produce a structured survey specification.
 
 For each question, determine:
-1. question_type: one of [single_choice, multiple_choice, likert_5, likert_7, open_ended, ranking, net_promoter]
+1. question_type: one of [single_choice, multiple_choice, likert_5, likert_7,
+   open_ended, ranking, net_promoter]
 2. options: appropriate response options (for choice/likert/ranking types)
-3. category: the survey category (brand_perception, purchase_intent, product_satisfaction, lifestyle, media_consumption, price_sensitivity, general)
+3. category: the survey category (brand_perception, purchase_intent,
+   product_satisfaction, lifestyle, media_consumption, price_sensitivity, general)
 
 IMPORTANT RULES:
-- For Likert-5 scales, always use: ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]
+- For Likert-5 scales, always use:
+  ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]
 - For Likert-7 scales, use the 7-point variant with "Somewhat" options
 - For NPS, options are "0" through "10"
 - For single_choice, generate 4-6 mutually exclusive, exhaustive options

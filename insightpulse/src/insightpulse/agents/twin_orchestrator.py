@@ -285,8 +285,6 @@ async def _generate_single_response(
     Returns:
         Response dictionary or None if generation fails.
     """
-    import json
-
     system_prompt, user_prompt = _build_persona_prompt(
         panelist, question, prior_responses
     )
