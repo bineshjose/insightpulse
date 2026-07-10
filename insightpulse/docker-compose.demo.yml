@@ -1,0 +1,28 @@
+# =============================================================================
+# InsightPulse — Demo Profile Overrides
+# =============================================================================
+# Lightweight configuration for running on a personal laptop.
+# Uses SQLite (no external DB), in-memory caching, and synthetic data.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
+# Or simply: make demo
+# =============================================================================
+
+services:
+  app:
+    environment:
+      - ENV=demo
+      - DATABASE_URL=sqlite+aiosqlite:///app/storage/insightpulse.db
+      - CACHE_BACKEND=memory
+      - DATA_SOURCE=synthetic
+      - LOG_LEVEL=DEBUG
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+
+  dashboard:
+    environment:
+      - ENV=demo
+      - STREAMLIT_THEME_BASE=light

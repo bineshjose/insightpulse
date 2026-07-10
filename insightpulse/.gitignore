@@ -1,0 +1,39 @@
+# Environment
+.env
+*.env.local
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Data (keep schemas and generators, ignore actual data files)
+data/synthetic/*.csv
+data/synthetic/*.parquet
+data/niq/
+*.db
+
+# Docker
+storage/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate*

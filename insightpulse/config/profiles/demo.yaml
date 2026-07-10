@@ -1,0 +1,42 @@
+# =============================================================================
+# InsightPulse — Demo Profile
+# =============================================================================
+# Lightweight settings for running on a personal laptop with Docker Desktop.
+# Uses synthetic data, SQLite, and in-memory caching.
+# =============================================================================
+
+env: demo
+debug: true
+log_level: DEBUG
+
+data_source: synthetic
+cache_backend: memory
+database_url: "sqlite+aiosqlite:///app/storage/insightpulse.db"
+
+default_cohort_size: 50
+stability_runs: 3
+
+llm:
+  model: "claude-sonnet-4-6"
+  temperature: 0.7
+  max_tokens: 2048
+
+agents:
+  max_validation_retries: 2
+  min_diversity_entropy: 1.5
+  consistency_threshold: 0.6
+  hallucination_threshold: 0.3
+  enable_cost_control: false
+  max_cost_per_run: 10.0
+
+calibration:
+  sinkhorn_epsilon: 0.1
+  sinkhorn_max_iter: 500
+  lambda_behavioral: 0.3
+  lambda_fairness: 0.2
+
+embedding:
+  embedding_dim: 128
+  encoder_num_heads: 4
+  encoder_num_layers: 2
+  num_clusters: 5

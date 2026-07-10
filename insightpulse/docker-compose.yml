@@ -1,0 +1,67 @@
+# =============================================================================
+# InsightPulse — Docker Compose (Base Configuration)
+# =============================================================================
+# Usage:
+#   Demo:       ENV=demo docker compose up --build
+#   Production: ENV=production docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+#
+# This base file defines the core services. Profile-specific overrides
+# are in docker-compose.demo.yml and docker-compose.prod.yml.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Core Application — FastAPI + LangGraph Agent Orchestration
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: insightpulse-app
+    env_file: .env
+    environment:
+      - ENV=${ENV:-demo}
+      - PYTHONPATH=/app/src
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./data:/app/data
+      - app-data:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Dashboard — Streamlit UI (5-tab interface)
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: insightpulse-dashboard
+    env_file: .env
+    environment:
+      - ENV=${ENV:-demo}
+      - API_URL=http://app:8000
+      - PYTHONPATH=/app/src
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./dashboard:/app/dashboard
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./data:/app/data
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  app-data:
+    driver: local

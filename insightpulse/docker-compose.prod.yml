@@ -1,0 +1,71 @@
+# =============================================================================
+# InsightPulse — Production Profile Overrides
+# =============================================================================
+# Full production stack with PostgreSQL, Redis, and monitoring.
+# Designed for cloud deployment (ECS/EKS) with Terraform.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+# =============================================================================
+
+services:
+  app:
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgresql+asyncpg://insightpulse:${DB_PASSWORD}@postgres:5432/insightpulse
+      - CACHE_BACKEND=redis
+      - REDIS_URL=redis://redis:6379/0
+      - DATA_SOURCE=api
+      - LOG_LEVEL=INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dashboard:
+    environment:
+      - ENV=production
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Persistent storage for audit logs, results, and experiments
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: insightpulse-postgres
+    environment:
+      - POSTGRES_DB=insightpulse
+      - POSTGRES_USER=insightpulse
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insightpulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis — Caching, embedding store, and agent message bus
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: insightpulse-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
