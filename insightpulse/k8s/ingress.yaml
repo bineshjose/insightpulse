@@ -1,0 +1,38 @@
+# Ingress for the API with TLS termination.
+# Assumes the cluster runs ingress-nginx and cert-manager with a
+# ClusterIssuer named `letsencrypt-prod` (both installed in the
+# deployment guide, docs/deployment.md).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: insightpulse-api
+  namespace: insightpulse
+  labels:
+    app.kubernetes.io/name: insightpulse-app
+    app.kubernetes.io/part-of: insightpulse
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    # Survey runs can take minutes on large cohorts — keep the proxy
+    # timeout above the pipeline's worst case.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # Edge rate limit complements the app-level limiter (defense in depth).
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.insightpulse.example.com   # replace with the owned domain
+      secretName: insightpulse-api-tls   # created/renewed by cert-manager
+  rules:
+    - host: api.insightpulse.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: insightpulse-app
+                port:
+                  name: http

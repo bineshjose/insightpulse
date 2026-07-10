@@ -1,0 +1,11 @@
+# Namespace isolating every InsightPulse workload.
+# Pod Security Admission enforces the "restricted" profile: non-root,
+# no privilege escalation, seccomp — violations are rejected at admission.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insightpulse
+  labels:
+    app.kubernetes.io/part-of: insightpulse
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted

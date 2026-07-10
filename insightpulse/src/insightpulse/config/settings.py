@@ -271,6 +271,15 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # --- API Hardening ---
+    # Per-client sliding-window rate limit (see api/rate_limit.py).
+    api_rate_limit_per_minute: int = Field(default=60, ge=1)
+    # Request validation bounds for /survey/run.
+    api_max_questions: int = Field(default=20, ge=1)
+    api_max_question_length: int = Field(default=500, ge=10)
+    # CORS origins; keep "*" for the demo, set explicitly in production.
+    cors_allow_origins: list[str] = Field(default_factory=lambda: ["*"])
+
     # --- Default LLM ---
     default_llm_model: str = "claude-sonnet-4-6"
 

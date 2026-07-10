@@ -1,0 +1,53 @@
+# Azure Key Vault CSI driver configuration.
+# Maps Key Vault secrets (created by terraform/keyvault.tf) into the
+# Kubernetes Secret `insightpulse-secrets`, which the deployments consume
+# via envFrom. Rotation is handled by the driver (interval configured in
+# Terraform) — no pod restarts needed for secret updates.
+#
+# Placeholders to substitute after `terraform apply` (see terraform outputs):
+#   ${KEYVAULT_NAME}          -> terraform output -raw key_vault_name
+#   ${KEYVAULT_CSI_CLIENT_ID} -> terraform output -raw keyvault_csi_client_id
+#   ${TENANT_ID}              -> terraform output -raw tenant_id
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: insightpulse-keyvault
+  namespace: insightpulse
+  labels:
+    app.kubernetes.io/part-of: insightpulse
+spec:
+  provider: azure
+  # Sync mounted files into a native Kubernetes Secret so deployments can
+  # use envFrom (the mount itself lives at /mnt/secrets).
+  secretObjects:
+    - secretName: insightpulse-secrets
+      type: Opaque
+      data:
+        - objectName: anthropic-api-key
+          key: ANTHROPIC_API_KEY
+        - objectName: openai-api-key
+          key: OPENAI_API_KEY
+        - objectName: database-url
+          key: DATABASE_URL
+        - objectName: redis-url
+          key: REDIS_URL
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "${KEYVAULT_CSI_CLIENT_ID}"
+    keyvaultName: "${KEYVAULT_NAME}"
+    tenantId: "${TENANT_ID}"
+    objects: |
+      array:
+        - |
+          objectName: anthropic-api-key
+          objectType: secret
+        - |
+          objectName: openai-api-key
+          objectType: secret
+        - |
+          objectName: database-url
+          objectType: secret
+        - |
+          objectName: redis-url
+          objectType: secret

@@ -1,0 +1,24 @@
+# LoadBalancer service exposing the dashboard directly.
+# The API stays behind the Ingress with TLS; the dashboard gets its own
+# Azure LB IP so evaluators can reach it without DNS setup. Restrict
+# loadBalancerSourceRanges to your organization's egress CIDRs.
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightpulse-dashboard
+  namespace: insightpulse
+  labels:
+    app.kubernetes.io/name: insightpulse-dashboard
+    app.kubernetes.io/part-of: insightpulse
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: insightpulse-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  # Lock down before demoing outside the team:
+  # loadBalancerSourceRanges:
+  #   - 203.0.113.0/24

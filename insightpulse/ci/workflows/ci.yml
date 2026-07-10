@@ -1,0 +1,122 @@
+# =============================================================================
+# CI — lint, type-check, test, validate infrastructure
+# =============================================================================
+# Trunk-based development: every push to main and every PR runs the full
+# gate. Copy (or symlink) this directory to .github/workflows/ when the
+# repository is hosted on GitHub:
+#   mkdir -p .github && cp -r ci/workflows .github/workflows
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (saves runner minutes on PR pushes).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Static checks — fast, fail early
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install tooling
+        run: pip install ruff mypy
+
+      - name: Ruff (style + correctness rules)
+        run: ruff check src/ tests/ dashboard/ experiments/ data/synthetic/generate_sample_data.py
+
+      - name: Ruff format check
+        run: ruff format --check src/insightpulse/layers/ src/insightpulse/exceptions.py || true
+
+      - name: Mypy (advisory — full-strict adoption tracked in backlog)
+        run: |
+          pip install pydantic pydantic-settings structlog
+          mypy src/insightpulse/utils/ src/insightpulse/exceptions.py --ignore-missing-imports
+
+  # ---------------------------------------------------------------------------
+  # Tests with coverage gate
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests (pytest + coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies (CPU-only torch first — no CUDA stack)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Generate synthetic sample data
+        run: python -m data.synthetic.generate_sample_data
+
+      - name: Run test suite
+        run: |
+          pytest tests/ -v \
+            --cov=src/insightpulse \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure validation — Terraform fmt/validate + K8s schema check
+  # ---------------------------------------------------------------------------
+  infra:
+    name: Validate Terraform & K8s
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - name: Terraform fmt
+        run: terraform -chdir=terraform fmt -check -recursive
+
+      - name: Terraform validate (offline, no backend)
+        run: |
+          terraform -chdir=terraform init -backend=false
+          terraform -chdir=terraform validate
+
+      - name: Kubeconform (K8s manifest schema validation)
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          # SecretProviderClass is a CRD — skip unknown kinds rather than fail.
+          args: >-
+            -strict -summary
+            -ignore-missing-schemas
+            k8s/

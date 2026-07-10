@@ -1,0 +1,50 @@
+# Horizontal Pod Autoscaler for the API.
+# Primary signal: CPU (survey runs are compute-bound in the pipeline).
+# Secondary signal: requests-per-second per pod — a *custom* metric that
+# requires prometheus-adapter (or KEDA) exposing
+# `http_requests_per_second` from the FastAPI /metrics endpoint; without
+# an adapter the HPA simply ignores the Pods metric and scales on CPU.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: insightpulse-app
+  namespace: insightpulse
+  labels:
+    app.kubernetes.io/name: insightpulse-app
+    app.kubernetes.io/part-of: insightpulse
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: insightpulse-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "50"
+  behavior:
+    scaleUp:
+      # React fast to survey bursts: double at most every 60s.
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      # Scale down slowly — pipeline runs are minutes-long.
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

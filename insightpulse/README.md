@@ -132,9 +132,21 @@ insightpulse/
 ├── dashboard/             # Streamlit app (5 pages + shared components)
 ├── experiments/           # 4 reproducible experiments + shared figure style
 ├── data/synthetic/        # Sample data generator (+ generated CSVs, git-ignored)
-├── tests/                 # pytest suite: agents (mocked LLM), calibration, models
-└── config/profiles/       # Environment profile YAMLs
+├── tests/                 # pytest: layers, agents, integration, factories, API
+├── config/profiles/       # Environment profile YAMLs
+├── terraform/             # Azure infrastructure (AKS, ACR, PostgreSQL, Redis, Key Vault)
+├── k8s/                   # Production Kubernetes manifests (HPA, ingress, KV CSI)
+├── ci/workflows/          # GitHub Actions: CI, CD (semver → AKS), security scans
+└── docs/                  # Architecture, ADRs, API reference, deployment guide
 ```
+
+## Documentation
+
+- [Architecture overview](docs/architecture.md) — the 5 layers, agent DAG, data flow
+- [Architecture Decision Records](docs/adr/) — LangGraph, LiteLLM, Sinkhorn OT, Strategy pattern, FAISS, AKS
+- [API reference](docs/api.md) — endpoints, validation rules, rate limits
+- [Deployment guide](docs/deployment.md) — local → Docker → AKS production
+- [Evaluator feedback matrix](docs/evaluator-feedback-matrix.md) — every feedback point mapped to code and evidence
 
 ## Configuration
 

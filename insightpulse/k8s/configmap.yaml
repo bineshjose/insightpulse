@@ -1,0 +1,19 @@
+# Non-secret runtime configuration for both deployments.
+# Secrets (API keys, DATABASE_URL, REDIS_URL) never go here — they are
+# mounted from Key Vault via the CSI driver (keyvault-csi.yaml) and
+# surfaced as the Kubernetes Secret `insightpulse-secrets`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insightpulse-config
+  namespace: insightpulse
+  labels:
+    app.kubernetes.io/part-of: insightpulse
+data:
+  ENV: "production"
+  LOG_LEVEL: "INFO"
+  DATA_SOURCE: "api"
+  CACHE_BACKEND: "redis"
+  DEFAULT_LLM_MODEL: "claude-sonnet-4-6"
+  DEFAULT_COHORT_SIZE: "100"
+  API_PORT: "8000"

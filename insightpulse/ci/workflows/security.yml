@@ -1,0 +1,74 @@
+# =============================================================================
+# Security — weekly dependency audit, secret scan, SAST
+# =============================================================================
+# Runs every Monday 03:00 UTC and on demand. Non-blocking on main pushes
+# (that's CI's job); this catches slowly-emerging risk: newly-disclosed
+# CVEs in pinned dependencies and secrets accidentally committed.
+# =============================================================================
+name: Security
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"   # Mondays 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve and audit the dependency tree
+        run: |
+          pip install pip-audit
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e .
+          pip-audit --skip-editable
+
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # scan full history, not just the tip
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast:
+    name: SAST (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bandit over the application source
+        run: |
+          pip install bandit
+          # B101 (assert) excluded for tests; src is scanned at default level.
+          bandit -r src/insightpulse -f txt
+
+      - name: Bandit report artifact (JSON, for the audit trail)
+        if: always()
+        run: |
+          bandit -r src/insightpulse -f json -o bandit-report.json || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30

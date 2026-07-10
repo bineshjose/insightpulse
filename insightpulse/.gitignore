@@ -1,6 +1,13 @@
-# Environment
+# Environment & secrets — never commit credentials in any form
 .env
+.env.*
+!.env.example
 *.env.local
+*.pem
+*.key
+*.pfx
+kubeconfig*
+coverage.xml
 
 # Python
 .venv/
@@ -19,7 +26,13 @@ htmlcov/
 data/synthetic/*.csv
 data/synthetic/*.parquet
 data/niq/
+data/benchmarks/*.csv
 *.db
+
+# Embedding caches & indexes
+data/synthetic/*.npz
+*.index
+*.index.ids.npy
 
 # Docker
 storage/
@@ -34,12 +47,15 @@ storage/
 .DS_Store
 Thumbs.db
 
-# Terraform
+# Terraform — state and plans can embed sensitive values
 terraform/.terraform/
 terraform/*.tfstate*
+terraform/tfplan
+terraform/*.tfplan
+terraform/crash.log
+terraform/override.tf
+terraform/*_override.tf
+# .terraform.lock.hcl is intentionally committed (provider pinning)
 
 # Experiment outputs (regenerate with make experiments)
 experiments/results/
-
-# Embedding caches
-data/synthetic/*.npz

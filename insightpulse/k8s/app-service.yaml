@@ -1,0 +1,19 @@
+# ClusterIP service for the API — internal only; external traffic
+# arrives through the Ingress (ingress.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: insightpulse-app
+  namespace: insightpulse
+  labels:
+    app.kubernetes.io/name: insightpulse-app
+    app.kubernetes.io/part-of: insightpulse
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: insightpulse-app
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

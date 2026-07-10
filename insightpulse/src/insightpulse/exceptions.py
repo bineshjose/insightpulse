@@ -47,3 +47,13 @@ class CalibrationError(InsightPulseError):
 
 class InsightError(InsightPulseError):
     """L5 failure: aggregation, statistical testing, or report assembly errors."""
+
+
+class BudgetExceededError(InsightPulseError):
+    """Cost-control violation: a run's spend crossed the configured ceiling.
+
+    Raised by cost-enforcement paths that must stop work immediately
+    (batch tooling); the LangGraph pipeline itself prefers the softer
+    ``budget_exceeded`` state flag so the AuditAgent can still finalize
+    a partial, clearly-labeled result.
+    """

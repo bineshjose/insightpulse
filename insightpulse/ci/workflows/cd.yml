@@ -1,0 +1,127 @@
+# =============================================================================
+# CD — build, push to ACR, deploy to AKS on semver tags
+# =============================================================================
+# Trunk-based development with semantic versioning: releases are cut by
+# tagging main (v1.4.2). The tag drives the image tag, so every running
+# pod is traceable to an exact commit.
+#
+# Required repository secrets (GitHub → Settings → Secrets):
+#   AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID
+#     — federated (OIDC) service principal with AcrPush + AKS user roles;
+#       no long-lived credentials are stored.
+# Required repository variables:
+#   ACR_LOGIN_SERVER, AKS_RESOURCE_GROUP, AKS_CLUSTER_NAME
+#     — from `terraform output`.
+# =============================================================================
+name: CD
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+  id-token: write   # OIDC federation with Azure — no stored credentials
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false   # never cancel a deploy midway
+
+jobs:
+  build-and-push:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: meta
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "${{ vars.ACR_LOGIN_SERVER }}"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build & push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ vars.ACR_LOGIN_SERVER }}/insightpulse-app:${{ steps.meta.outputs.version }}
+            ${{ vars.ACR_LOGIN_SERVER }}/insightpulse-app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.streamlit
+          push: true
+          tags: |
+            ${{ vars.ACR_LOGIN_SERVER }}/insightpulse-dashboard:${{ steps.meta.outputs.version }}
+            ${{ vars.ACR_LOGIN_SERVER }}/insightpulse-dashboard:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to AKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production   # gated: requires reviewer approval in GitHub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
+            --name "${{ vars.AKS_CLUSTER_NAME }}" \
+            --overwrite-existing
+
+      - name: Render image tags into manifests
+        run: |
+          VERSION="${{ needs.build-and-push.outputs.version }}"
+          sed -i "s|:IMAGE_TAG|:${VERSION}|g" k8s/app-deployment.yaml k8s/dashboard-deployment.yaml
+          sed -i "s|acrinsightpulseprod.azurecr.io|${{ vars.ACR_LOGIN_SERVER }}|g" \
+            k8s/app-deployment.yaml k8s/dashboard-deployment.yaml
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/keyvault-csi.yaml
+          kubectl apply -f k8s/app-deployment.yaml -f k8s/app-service.yaml
+          kubectl apply -f k8s/dashboard-deployment.yaml -f k8s/dashboard-service.yaml
+          kubectl apply -f k8s/hpa.yaml -f k8s/ingress.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n insightpulse rollout status deployment/insightpulse-app --timeout=300s
+          kubectl -n insightpulse rollout status deployment/insightpulse-dashboard --timeout=300s
+
+      - name: Smoke test
+        run: |
+          kubectl -n insightpulse run smoke --rm -i --restart=Never \
+            --image=curlimages/curl:8.9.1 -- \
+            curl -fsS http://insightpulse-app:8000/health

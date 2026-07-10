@@ -10,4 +10,27 @@ with NielsenIQ.
 Author: Binesh Jose (CH24M521)
 """
 
+from insightpulse.exceptions import (
+    BudgetExceededError,
+    CalibrationError,
+    CircuitBreakerOpenError,
+    DataLayerError,
+    EmbeddingError,
+    GenerationError,
+    InsightError,
+    InsightPulseError,
+)
+
 __version__ = "1.0.0"
+
+__all__ = [
+    "BudgetExceededError",
+    "CalibrationError",
+    "CircuitBreakerOpenError",
+    "DataLayerError",
+    "EmbeddingError",
+    "GenerationError",
+    "InsightError",
+    "InsightPulseError",
+    "__version__",
+]
