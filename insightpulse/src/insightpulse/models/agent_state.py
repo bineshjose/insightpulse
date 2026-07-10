@@ -1,45 +1,51 @@
 """LangGraph shared state for the agent orchestration DAG.
 
 This is the central data structure that flows through the LangGraph
-pipeline. Each agent reads from and writes to this state, enabling
-typed, validated communication between agents without custom protocols.
+pipeline. Each agent reads the fields it needs and returns a partial
+update; LangGraph merges updates into the shared state per the channel
+reducers declared here.
 
-The state replaces the custom A2A (Agent-to-Agent) protocol from the
-original thesis with LangGraph's built-in typed state management —
-achieving the same functionality with better tooling support.
+Design decisions
+    * ``SurveyPipelineState`` is a **TypedDict** (not a Pydantic model):
+      LangGraph hands nodes the state with dict semantics, which is what
+      every agent's ``state.get(...)`` access assumes. Pydantic validation
+      belongs at the API boundary, not inside the hot loop.
+    * ``total=False`` — states are built up incrementally; most keys are
+      absent until their owning agent runs.
+    * ``agent_trace`` carries an **accumulating reducer** so every agent's
+      trace entry survives to the end (audit requirement). All other
+      channels are last-value-wins: agents own their keys exclusively, and
+      regeneration retries must *replace* stale responses, not append to
+      them.
 
-State Flow:
-    SurveyDesigner → writes parsed questions + context
-    CohortSelector → writes selected panelist cohort
-    TwinOrchestrator → writes raw synthetic responses
-    Validator → writes validation results, may flag for regeneration
-    CalibrationAgent → writes calibrated distributions
-    DiversityMonitor → writes entropy metrics, may adjust temperature
-    CostAgent → writes cost tracking, may halt if over budget
-    AuditAgent → writes complete provenance log
+State flow (owner -> fields):
+    SurveyDesigner   -> parsed_questions
+    CohortSelector   -> selected_panelist_ids, selected_panelists,
+                        cohort_demographics_summary, embedding_info
+    TwinOrchestrator -> raw_responses, generation_metadata
+    Validator        -> validated_responses, rejected_responses,
+                        needs_regeneration, validation_retry_count
+    CostAgent        -> total_cost_usd, total_tokens, cost_per_response,
+                        budget_exceeded, cost_breakdown
+    CalibrationAgent -> calibrated_distributions, calibration_metrics,
+                        calibration_converged, calibration_convergence
+    DiversityMonitor -> response_entropy, diversity_acceptable,
+                        temperature_adjustments
+    AuditAgent       -> results, insight_report, provenance_hash,
+                        hallucination_rate, consistency_score, status
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any
-from uuid import UUID, uuid4
+from typing import Annotated, Any, TypedDict
 
 from pydantic import BaseModel, Field
 
 
 def _merge_lists(left: list, right: list) -> list:
-    """Merge strategy for list fields in LangGraph state.
-
-    LangGraph uses reducer functions to merge state updates from
-    parallel agent executions. For lists, we concatenate.
-    """
+    """Accumulating reducer: concatenate state updates for list channels."""
     return left + right
-
-
-def _merge_dicts(left: dict, right: dict) -> dict:
-    """Merge strategy for dict fields — right-side wins on conflicts."""
-    return {**left, **right}
 
 
 class AgentTraceEntry(BaseModel):
@@ -59,135 +65,64 @@ class AgentTraceEntry(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class SurveyPipelineState(BaseModel):
+class SurveyPipelineState(TypedDict, total=False):
     """Shared state for the LangGraph survey orchestration pipeline.
 
-    This TypedDict-style state is the single source of truth for the
-    entire agent DAG. Each agent reads what it needs and writes its
-    outputs back. LangGraph handles state persistence, checkpointing,
-    and replay.
-
-    Design principle: every field has a clear owner (the agent that
-    writes it) and clear consumers (the agents that read it).
+    Every field has one owning agent (writer) and explicit consumers;
+    see the module docstring for the ownership map.
     """
 
-    # --- Run Identity ---
-    run_id: UUID = Field(default_factory=uuid4)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    status: str = Field(
-        default="initialized",
-        description="Pipeline status: initialized → running → completed | failed",
-    )
+    # --- Input (set by the API caller / run_survey) ---
+    raw_questions: list[str]
+    question_context: str
+    requested_cohort_size: int
+    requested_models: list[str]
+    cohort_filters: dict[str, str]
+    random_seed: int | None
+    status: str
 
-    # --- Input (set by API caller) ---
-    raw_questions: list[str] = Field(
-        default_factory=list,
-        description="Raw survey question texts from the user",
-    )
-    question_context: str = Field(
-        default="",
-        description="Domain context for the survey (e.g., 'snack food market in the US')",
-    )
-    requested_cohort_size: int = Field(default=100, ge=1)
-    requested_models: list[str] = Field(
-        default_factory=list,
-        description="LLM models to use (empty = use default)",
-    )
-    cohort_filters: dict[str, str] = Field(
-        default_factory=dict,
-        description="Demographic filters for cohort selection",
-    )
-    random_seed: int | None = Field(default=None)
+    # --- SurveyDesigner ---
+    parsed_questions: list[dict]
 
-    # --- SurveyDesigner Output ---
-    parsed_questions: list[dict] = Field(
-        default_factory=list,
-        description="Structured SurveyQuestion objects (serialized)",
-    )
+    # --- CohortSelector ---
+    selected_panelist_ids: list[str]
+    selected_panelists: list[dict]
+    cohort_demographics_summary: dict[str, Any]
+    embedding_info: dict[str, Any]
 
-    # --- CohortSelector Output ---
-    selected_panelist_ids: list[str] = Field(
-        default_factory=list,
-        description="IDs of selected synthetic respondents",
-    )
-    cohort_demographics_summary: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Summary statistics of the selected cohort",
-    )
+    # --- TwinOrchestrator ---
+    raw_responses: list[dict]
+    generation_metadata: dict[str, Any]
 
-    # --- TwinOrchestrator Output ---
-    raw_responses: Annotated[list[dict], _merge_lists] = Field(
-        default_factory=list,
-        description="Raw synthetic responses before validation",
-    )
-    generation_metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Token counts, costs, latencies from generation",
-    )
+    # --- Validator ---
+    validated_responses: list[dict]
+    rejected_responses: list[dict]
+    validation_retry_count: int
+    needs_regeneration: bool
 
-    # --- Validator Output ---
-    validated_responses: list[dict] = Field(
-        default_factory=list,
-        description="Responses that passed validation",
-    )
-    rejected_responses: list[dict] = Field(
-        default_factory=list,
-        description="Responses that failed validation with reasons",
-    )
-    validation_retry_count: int = Field(default=0, ge=0)
-    needs_regeneration: bool = Field(
-        default=False,
-        description="Flag for TwinOrchestrator to regenerate rejected responses",
-    )
+    # --- CalibrationAgent ---
+    calibrated_distributions: dict[str, list[float]]
+    calibration_metrics: list[dict]
+    calibration_converged: bool
+    calibration_convergence: dict[str, list[float]]
 
-    # --- CalibrationAgent Output ---
-    calibrated_distributions: dict[str, list[float]] = Field(
-        default_factory=dict,
-        description="Post-BDCL calibrated distributions keyed by question_id",
-    )
-    calibration_metrics: list[dict] = Field(
-        default_factory=list,
-        description="CalibrationMetrics for each question",
-    )
-    calibration_converged: bool = Field(default=True)
+    # --- DiversityMonitor ---
+    response_entropy: dict[str, float]
+    diversity_acceptable: bool
+    temperature_adjustments: dict[str, float]
 
-    # --- DiversityMonitor Output ---
-    response_entropy: dict[str, float] = Field(
-        default_factory=dict,
-        description="Shannon entropy per question",
-    )
-    diversity_acceptable: bool = Field(
-        default=True,
-        description="Whether diversity meets minimum threshold",
-    )
-    temperature_adjustments: dict[str, float] = Field(
-        default_factory=dict,
-        description="Temperature adjustments applied per question",
-    )
+    # --- CostAgent ---
+    total_cost_usd: float
+    total_tokens: int
+    cost_per_response: float
+    budget_exceeded: bool
+    cost_breakdown: dict[str, float]
 
-    # --- CostAgent Output ---
-    total_cost_usd: float = Field(default=0.0, ge=0.0)
-    total_tokens: int = Field(default=0, ge=0)
-    cost_per_response: float = Field(default=0.0, ge=0.0)
-    budget_exceeded: bool = Field(default=False)
-    cost_breakdown: dict[str, float] = Field(
-        default_factory=dict,
-        description="Cost breakdown by model and agent",
-    )
-
-    # --- AuditAgent Output ---
-    agent_trace: Annotated[list[dict], _merge_lists] = Field(
-        default_factory=list,
-        description="Ordered execution trace for reproducibility",
-    )
-    provenance_hash: str = Field(
-        default="",
-        description="SHA-256 hash of inputs + config for provenance verification",
-    )
-
-    # --- Final Results ---
-    results: list[dict] = Field(
-        default_factory=list,
-        description="Final SurveyResult objects (serialized)",
-    )
-    error_message: str = Field(default="")
+    # --- AuditAgent ---
+    agent_trace: Annotated[list[dict], _merge_lists]
+    provenance_hash: str
+    results: list[dict]
+    insight_report: dict[str, Any]
+    hallucination_rate: float
+    consistency_score: float
+    error_message: str

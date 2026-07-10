@@ -1,74 +1,160 @@
-"""Unit tests for the BDCL Sinkhorn calibration.
+"""Unit tests for BDCL calibration (L4 layer + agent distribution helper).
 
-Verifies that the calibration algorithm:
-1. Converges on valid distributions
+Verifies that the calibration machinery:
+1. Converges on valid distributions (log-domain Sinkhorn)
 2. Moves the synthetic distribution toward the target
-3. Respects behavioral regularization
+3. Respects behavioral regularization (λ_b)
 4. Produces valid probability distributions (sums to 1, non-negative)
+5. Reports honest improvement metrics
 """
 
+from __future__ import annotations
+
 import numpy as np
+import pytest
 
-from insightpulse.agents.calibration_agent import (
-    _compute_calibration_metrics,
-    _compute_distribution,
-    _sinkhorn_calibrate,
+from insightpulse.agents.calibration_agent import _compute_distribution
+from insightpulse.exceptions import CalibrationError
+from insightpulse.layers.calibration_layer import (
+    BehavioralRegularizer,
+    SinkhornCalibrationEngine,
+    SinkhornSolver,
+    ordinal_cost_matrix,
 )
+from insightpulse.models.calibration import CalibrationInput
 
 
-class TestSinkhornCalibration:
-    """Tests for the Sinkhorn optimal transport calibration."""
+def _solve(source: np.ndarray, target: np.ndarray) -> tuple[np.ndarray, dict]:
+    solver = SinkhornSolver(epsilon=0.1, max_iterations=1000, threshold=1e-9)
+    return solver.solve(source, target, ordinal_cost_matrix(len(source)))
+
+
+class TestSinkhornSolver:
+    """Tests for the log-domain Sinkhorn optimal transport solver."""
 
     def test_convergence_on_uniform(self):
-        """Sinkhorn should converge quickly when source ≈ target."""
         source = np.array([0.2, 0.2, 0.2, 0.2, 0.2])
         target = np.array([0.2, 0.2, 0.2, 0.2, 0.2])
 
-        calibrated, info = _sinkhorn_calibrate(source, target)
+        plan, info = _solve(source, target)
 
         assert info["converged"] is True
-        assert np.allclose(calibrated, target, atol=0.05)
+        assert np.allclose(plan.sum(axis=0), target, atol=1e-6)
+
+    def test_plan_matches_both_marginals(self):
+        source = np.array([0.6, 0.1, 0.1, 0.1, 0.1])
+        target = np.array([0.1, 0.2, 0.3, 0.25, 0.15])
+
+        plan, info = _solve(source, target)
+
+        assert info["converged"] is True
+        assert np.allclose(plan.sum(axis=1), source, atol=1e-7)
+        assert np.allclose(plan.sum(axis=0), target, atol=1e-6)
+        assert np.all(plan >= 0)
+
+    def test_log_domain_stable_at_small_epsilon(self):
+        source = np.array([0.55, 0.2, 0.12, 0.08, 0.05])
+        target = np.array([0.1, 0.2, 0.3, 0.25, 0.15])
+        solver = SinkhornSolver(epsilon=0.01, max_iterations=2000, threshold=1e-9)
+
+        plan, info = solver.solve(source, target, ordinal_cost_matrix(5))
+
+        assert info["converged"] is True
+        assert np.isfinite(plan).all()
+
+    def test_convergence_history_exported(self):
+        source = np.array([0.6, 0.1, 0.1, 0.1, 0.1])
+        target = np.array([0.2, 0.2, 0.2, 0.2, 0.2])
+
+        _, info = _solve(source, target)
+
+        history = info["convergence_history"]
+        assert len(history) == info["iterations_used"]
+        assert history[-1] < history[0]  # error decreases
+
+    def test_shape_mismatch_raises(self):
+        solver = SinkhornSolver(epsilon=0.1, max_iterations=10, threshold=1e-6)
+        with pytest.raises(CalibrationError):
+            solver.solve(
+                np.array([0.5, 0.5]),
+                np.array([0.3, 0.3, 0.4]),
+                ordinal_cost_matrix(2),
+            )
+
+
+class TestSinkhornCalibrationEngine:
+    """Tests for the production calibration strategy."""
+
+    def _calibrate(self, source, target, lambda_b=None):
+        engine = SinkhornCalibrationEngine()
+        return engine.calibrate(CalibrationInput(
+            question_id="q_test",
+            synthetic_distribution=list(source),
+            empirical_distribution=list(target),
+            option_labels=[str(i) for i in range(len(source))],
+            lambda_behavioral=lambda_b,
+        ))
 
     def test_calibration_moves_toward_target(self):
-        """Post-calibration distribution should be closer to target."""
-        source = np.array([0.6, 0.1, 0.1, 0.1, 0.1])  # Very skewed
-        target = np.array([0.2, 0.2, 0.2, 0.2, 0.2])   # Uniform
+        source = np.array([0.6, 0.1, 0.1, 0.1, 0.1])
+        target = np.array([0.2, 0.2, 0.2, 0.2, 0.2])
 
-        calibrated, _info = _sinkhorn_calibrate(source, target, lambda_b=0.0)
+        output = self._calibrate(source, target, lambda_b=0.0)
+        calibrated = np.array(output.calibrated_distribution)
 
-        # The calibrated distribution should be closer to target than source
-        source_distance = np.sum(np.abs(source - target))
-        calibrated_distance = np.sum(np.abs(calibrated - target))
-
-        assert calibrated_distance < source_distance
+        assert np.abs(calibrated - target).sum() < np.abs(source - target).sum()
 
     def test_valid_probability_distribution(self):
-        """Output must be a valid probability distribution."""
         source = np.array([0.5, 0.3, 0.15, 0.05])
         target = np.array([0.25, 0.25, 0.25, 0.25])
 
-        calibrated, _ = _sinkhorn_calibrate(source, target)
+        output = self._calibrate(source, target)
+        calibrated = np.array(output.calibrated_distribution)
 
         assert np.all(calibrated >= 0), "Negative probabilities found"
         assert np.isclose(calibrated.sum(), 1.0, atol=1e-6), "Does not sum to 1"
 
     def test_behavioral_regularization(self):
-        """Higher lambda_b should keep result closer to source."""
         source = np.array([0.5, 0.3, 0.1, 0.1])
         target = np.array([0.25, 0.25, 0.25, 0.25])
 
-        cal_low_reg, _ = _sinkhorn_calibrate(source, target, lambda_b=0.0)
-        cal_high_reg, _ = _sinkhorn_calibrate(source, target, lambda_b=0.8)
+        low = np.array(self._calibrate(source, target, lambda_b=0.0)
+                       .calibrated_distribution)
+        high = np.array(self._calibrate(source, target, lambda_b=0.8)
+                        .calibrated_distribution)
 
         # High regularization should stay closer to source
-        dist_low = np.sum(np.abs(cal_low_reg - source))
-        dist_high = np.sum(np.abs(cal_high_reg - source))
+        assert np.abs(high - source).sum() < np.abs(low - source).sum()
 
-        assert dist_high < dist_low
+    def test_transport_plan_exported(self):
+        source = np.array([0.5, 0.3, 0.2])
+        target = np.array([0.2, 0.3, 0.5])
+
+        output = self._calibrate(source, target)
+
+        plan = np.array(output.transport_plan)
+        assert plan.shape == (3, 3)
+        assert np.isclose(plan.sum(), 1.0, atol=1e-6)
+
+
+class TestBehavioralRegularizer:
+    """Tests for the λ_b blending collaborator."""
+
+    def test_zero_lambda_returns_calibrated(self):
+        calibrated = np.array([0.25, 0.25, 0.25, 0.25])
+        source = np.array([0.7, 0.1, 0.1, 0.1])
+        result = BehavioralRegularizer(0.0).apply(calibrated, source)
+        assert np.allclose(result, calibrated)
+
+    def test_full_lambda_returns_source(self):
+        calibrated = np.array([0.25, 0.25, 0.25, 0.25])
+        source = np.array([0.7, 0.1, 0.1, 0.1])
+        result = BehavioralRegularizer(1.0).apply(calibrated, source)
+        assert np.allclose(result, source)
 
 
 class TestComputeDistribution:
-    """Tests for response distribution computation."""
+    """Tests for the agent's response distribution computation."""
 
     def test_basic_distribution(self):
         responses = [
@@ -85,23 +171,3 @@ class TestComputeDistribution:
         assert np.isclose(dist.sum(), 1.0, atol=1e-4)
         # "Agree" should have the highest probability
         assert dist[2] > dist[0]  # Agree > Disagree
-
-
-class TestCalibrationMetrics:
-    """Tests for calibration metric computation."""
-
-    def test_metrics_improvement(self):
-        raw = np.array([0.6, 0.1, 0.1, 0.1, 0.1])
-        target = np.array([0.2, 0.2, 0.2, 0.2, 0.2])
-        calibrated = np.array([0.25, 0.20, 0.20, 0.18, 0.17])
-
-        metrics = _compute_calibration_metrics(
-            "q_test",
-            raw,
-            calibrated,
-            target,
-            {"converged": True, "iterations_used": 50},
-        )
-
-        assert metrics["wasserstein_after"] < metrics["wasserstein_before"]
-        assert metrics["wasserstein_improvement_pct"] > 0

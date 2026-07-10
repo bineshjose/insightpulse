@@ -37,6 +37,7 @@ from insightpulse.agents.diversity_monitor import diversity_monitor_node
 from insightpulse.agents.survey_designer import survey_designer_node
 from insightpulse.agents.twin_orchestrator import twin_orchestrator_node
 from insightpulse.agents.validator import validator_node
+from insightpulse.models.agent_state import SurveyPipelineState
 
 logger = structlog.get_logger(__name__)
 
@@ -143,8 +144,10 @@ def build_survey_pipeline() -> StateGraph:
     """
     logger.info("building_survey_pipeline")
 
-    # Create the state graph with our typed state
-    workflow = StateGraph(dict)
+    # Typed state schema: gives every field its own channel (last-value by
+    # default, accumulating for agent_trace). A bare `dict` schema would
+    # collapse the state into one channel and drop earlier agents' writes.
+    workflow = StateGraph(SurveyPipelineState)
 
     # -----------------------------------------------------------------------
     # Add agent nodes

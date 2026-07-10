@@ -130,12 +130,100 @@ class EmbeddingConfig(BaseSettings):
     encoder_hidden_dim: int = Field(default=256, ge=32)
     encoder_dropout: float = Field(default=0.1, ge=0.0, le=0.5)
 
+    # Maximum purchase-sequence length fed to the encoder (longer sequences
+    # are truncated to the most recent events; shorter ones are padded)
+    max_sequence_length: int = Field(default=128, ge=8, le=1024)
+
     # K-Means clustering for behavioral archetypes
     num_clusters: int = Field(default=5, ge=2, le=20)
+
+    # Candidate K range scanned by the elbow/silhouette analysis
+    kmeans_k_min: int = Field(default=2, ge=2)
+    kmeans_k_max: int = Field(default=8, ge=2)
 
     # FAISS index type for cohort selection
     faiss_index_type: str = "IVFFlat"
     faiss_nprobe: int = Field(default=10, ge=1)
+
+    # Neighbors beyond this L2 distance are not considered cohort-similar
+    faiss_distance_threshold: float = Field(default=25.0, ge=0.0)
+
+    # Random seed for encoder init and K-Means (reproducible embeddings)
+    random_seed: int = Field(default=42, ge=0)
+
+    # File stem for the on-disk embedding cache (relative to the data dir)
+    embedding_cache_name: str = "embeddings_cache.npz"
+
+
+# ---------------------------------------------------------------------------
+# Data Layer Configuration (L1)
+# ---------------------------------------------------------------------------
+
+class DataLayerConfig(BaseSettings):
+    """Configuration for L1 repositories (CSV and SQL)."""
+
+    # In-process cache TTL for loaded datasets (seconds)
+    cache_ttl_seconds: float = Field(default=300.0, ge=0.0)
+
+    # Loads fail when more than this fraction of rows are schema-invalid
+    max_invalid_row_fraction: float = Field(default=0.05, ge=0.0, le=1.0)
+
+    # Retry policy for transient SQL failures (tenacity)
+    retry_attempts: int = Field(default=3, ge=1, le=10)
+    retry_wait_seconds: float = Field(default=0.5, ge=0.0)
+
+    # SQLAlchemy async pool sizing (production)
+    pool_size: int = Field(default=5, ge=1)
+    max_overflow: int = Field(default=10, ge=0)
+    pool_timeout_seconds: float = Field(default=30.0, ge=1.0)
+
+
+# ---------------------------------------------------------------------------
+# Generation Configuration (L3)
+# ---------------------------------------------------------------------------
+
+class GenerationConfig(BaseSettings):
+    """Configuration for L3 LLM generation (concurrency + resilience)."""
+
+    # Maximum concurrent LLM calls (semaphore-limited)
+    max_concurrency: int = Field(default=8, ge=1, le=64)
+
+    # Retry policy for individual LLM calls (tenacity)
+    retry_attempts: int = Field(default=3, ge=1, le=10)
+    retry_wait_seconds: float = Field(default=1.0, ge=0.0)
+
+    # Circuit breaker: open after N consecutive failures, probe again
+    # (half-open) after the recovery window
+    circuit_failure_threshold: int = Field(default=5, ge=1)
+    circuit_recovery_seconds: float = Field(default=30.0, ge=1.0)
+
+    # Token budget per response — exceeded responses are flagged
+    max_tokens_per_response: int = Field(default=512, ge=32, le=8192)
+
+    # Persona prompt template version (recorded in provenance)
+    prompt_template_version: str = "v2.1"
+
+
+# ---------------------------------------------------------------------------
+# Insight Configuration (L5)
+# ---------------------------------------------------------------------------
+
+class InsightConfig(BaseSettings):
+    """Configuration for L5 analytics, significance testing, and drift."""
+
+    # Chi-square significance level for demographic breakdowns
+    significance_alpha: float = Field(default=0.05, gt=0.0, lt=1.0)
+
+    # Chi-square validity: minimum expected count per contingency cell
+    min_expected_cell_count: float = Field(default=5.0, ge=0.0)
+
+    # Drift detection: baseline window and trigger definition
+    # (trigger = noise mean + sigma_multiplier * noise std; see
+    # experiments/drift_detection.py for the empirical derivation)
+    drift_baseline_periods: int = Field(default=3, ge=1)
+    drift_sigma_multiplier: float = Field(default=3.0, ge=0.0)
+    drift_consecutive_periods: int = Field(default=2, ge=1)
+    drift_hard_multiplier: float = Field(default=2.0, ge=1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +283,9 @@ class Settings(BaseSettings):
     agents: AgentConfig = AgentConfig()
     calibration: CalibrationConfig = CalibrationConfig()
     embedding: EmbeddingConfig = EmbeddingConfig()
+    data_layer: DataLayerConfig = DataLayerConfig()
+    generation: GenerationConfig = GenerationConfig()
+    insight: InsightConfig = InsightConfig()
 
     @field_validator("log_level")
     @classmethod

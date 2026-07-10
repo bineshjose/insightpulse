@@ -40,3 +40,6 @@ terraform/*.tfstate*
 
 # Experiment outputs (regenerate with make experiments)
 experiments/results/
+
+# Embedding caches
+data/synthetic/*.npz

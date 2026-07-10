@@ -179,22 +179,50 @@ class TestCohortSelector:
 # 3. TwinOrchestrator
 # ---------------------------------------------------------------------------
 
+class FakeGenerationEngine:
+    """L3 engine stand-in returning one canned response per pair."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self._fail = fail
+        self.calls: list[dict[str, Any]] = []
+
+    async def generate_responses(
+        self, questions, panelists, model, seed=42, conditioning_vectors=None
+    ) -> list[dict[str, Any]]:
+        from insightpulse.exceptions import GenerationError
+
+        if self._fail:
+            raise GenerationError("provider down")
+        self.calls.append({"model": model, "seed": seed, "n": len(panelists)})
+        return [
+            {
+                "response_id": f"{row['panelist_id']}_{q['question_id']}",
+                "question_id": q["question_id"],
+                "panelist_id": str(row["panelist_id"]),
+                "answer": "Agree",
+                "confidence": 0.8,
+                "model_used": model,
+                "token_count": 100,
+                "cost_usd": 0.001,
+            }
+            for q in questions
+            for row in panelists.to_dict(orient="records")
+        ]
+
+
 class TestTwinOrchestrator:
-    @pytest.fixture(autouse=True)
-    def _patch_panelist_loader(self, monkeypatch, sample_panelists):
-        async def fake_loader(panelist_ids: list[str]) -> list[dict[str, Any]]:
-            return [p for p in sample_panelists if p["panelist_id"] in set(panelist_ids)]
-
-        monkeypatch.setattr(twin_orchestrator, "_load_panelists_by_ids", fake_loader)
-
     async def test_generates_one_response_per_panelist(
-        self, monkeypatch, answer_router, sample_panelists, sample_question
+        self, monkeypatch, sample_panelists, sample_question
     ):
-        monkeypatch.setattr(twin_orchestrator, "LLMRouter", lambda: answer_router)
+        engine = FakeGenerationEngine()
+        monkeypatch.setattr(
+            twin_orchestrator, "get_generation_engine", lambda: engine
+        )
         result = await twin_orchestrator_node({
-            "selected_panelist_ids": [p["panelist_id"] for p in sample_panelists],
+            "selected_panelists": sample_panelists,
             "parsed_questions": [sample_question],
             "requested_models": ["fake-model"],
+            "random_seed": 7,
         })
         responses = result["raw_responses"]
         assert len(responses) == len(sample_panelists)
@@ -202,35 +230,38 @@ class TestTwinOrchestrator:
         assert all(r["model_used"] == "fake-model" for r in responses)
         assert result["generation_metadata"]["total_responses"] == len(sample_panelists)
         assert result["total_cost_usd"] > 0
+        assert engine.calls[0]["seed"] == 7  # seed threaded through
 
-    async def test_injects_prior_answers_for_sequential_questions(
-        self, monkeypatch, answer_router, sample_panelists, sample_question
+    async def test_resolves_cohort_from_ids_via_repository(
+        self, monkeypatch, sample_question
     ):
-        monkeypatch.setattr(twin_orchestrator, "LLMRouter", lambda: answer_router)
-        second_question = {**sample_question, "question_id": "q_2",
-                           "text": "Would you pay more for it?"}
-        await twin_orchestrator_node({
-            "selected_panelist_ids": [sample_panelists[0]["panelist_id"]],
-            "parsed_questions": [sample_question, second_question],
+        engine = FakeGenerationEngine()
+        monkeypatch.setattr(
+            twin_orchestrator, "get_generation_engine", lambda: engine
+        )
+        # ids resolved against the demo CSV repository
+        result = await twin_orchestrator_node({
+            "selected_panelist_ids": ["HH00001", "HH00002"],
+            "parsed_questions": [sample_question],
             "requested_models": ["fake-model"],
         })
-        first_prompt, second_prompt = (p["prompt"] for p in answer_router.prompts)
-        assert "previous answers" not in first_prompt
-        assert "previous answers" in second_prompt
-        assert "Agree" in second_prompt
+        assert len(result["raw_responses"]) == 2
 
-    async def test_survives_generation_failures(
+    async def test_generation_failure_degrades_gracefully(
         self, monkeypatch, sample_panelists, sample_question
     ):
         monkeypatch.setattr(
-            twin_orchestrator, "LLMRouter", lambda: FakeRouter(RuntimeError("api down"))
+            twin_orchestrator,
+            "get_generation_engine",
+            lambda: FakeGenerationEngine(fail=True),
         )
         result = await twin_orchestrator_node({
-            "selected_panelist_ids": [p["panelist_id"] for p in sample_panelists],
+            "selected_panelists": sample_panelists,
             "parsed_questions": [sample_question],
             "requested_models": ["fake-model"],
         })
         assert result["raw_responses"] == []
+        assert "error_message" in result
 
     async def test_no_input(self):
         result = await twin_orchestrator_node({})

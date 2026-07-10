@@ -1,16 +1,25 @@
-"""CohortSelector agent — selects synthetic respondent cohorts.
+"""CohortSelector agent — thin orchestration wrapper over L1 + L2.
 
-Selects a demographically representative cohort of synthetic panelists
-from the embedding space using FAISS vector similarity search and
-stratified sampling. Ensures the cohort matches target population
-distributions for age, income, region, and behavioral archetypes.
+Delegates data access to the environment's
+:class:`~insightpulse.layers.data_layer.DataRepository` and behavioral
+enrichment (embeddings, archetype clusters) to the environment's
+:class:`~insightpulse.layers.embedding_layer.EmbeddingEngine`, both
+obtained from the layer factories.
 
-Responsibilities:
-    - Load panelist embeddings and demographic data
-    - Apply demographic filters from the user request
-    - Perform stratified sampling to match population targets
-    - Use FAISS for efficient nearest-neighbor cohort expansion
-    - Report cohort composition summary for validation
+The agent's own responsibilities are strictly orchestration:
+    1. Load the panelist pool (L1).
+    2. Enrich it with behavioral cluster assignments (L2) — used by both
+       stratified sampling here and persona construction in L3. Enrichment
+       is best-effort: if purchases are unavailable the cohort still forms,
+       just without behavioral stratification.
+    3. Apply demographic filters and stratified sampling.
+    4. Report the cohort composition for validation.
+
+State contract:
+    reads  ``requested_cohort_size``, ``cohort_filters``
+    writes ``selected_panelist_ids``, ``selected_panelists`` (enriched
+           records consumed by the TwinOrchestrator),
+           ``cohort_demographics_summary``, ``embedding_info``.
 """
 
 from __future__ import annotations
@@ -20,31 +29,23 @@ from collections import Counter
 from typing import Any
 
 import numpy as np
-import structlog
 
 from insightpulse.config.settings import get_settings
+from insightpulse.exceptions import DataLayerError, EmbeddingError
+from insightpulse.layers import get_data_repository, get_embedding_engine
+from insightpulse.utils.logging import get_logger
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 async def cohort_selector_node(state: dict[str, Any]) -> dict[str, Any]:
     """LangGraph node: select a representative respondent cohort.
 
-    Reads `requested_cohort_size` and `cohort_filters` from state.
-    Writes `selected_panelist_ids` and `cohort_demographics_summary`.
-
-    The cohort selection process:
-    1. Load all available panelist profiles
-    2. Apply demographic filters (if any)
-    3. Perform stratified sampling to ensure representativeness
-    4. Use FAISS index for diversity-aware selection when needed
-    5. Compute and report cohort composition
-
     Args:
         state: Current pipeline state.
 
     Returns:
-        State updates with selected panelist IDs and summary.
+        State updates with the selected cohort and composition summary.
     """
     start_time = time.perf_counter()
     settings = get_settings()
@@ -57,24 +58,36 @@ async def cohort_selector_node(state: dict[str, Any]) -> dict[str, Any]:
         filters=filters,
     )
 
-    # Load available panelists from the data layer
-    panelists = await _load_panelist_pool()
+    repository = get_data_repository()
+    try:
+        panelists_frame = await repository.get_panelists()
+    except DataLayerError as exc:
+        logger.error("cohort_selector_data_unavailable", error=str(exc)[:300])
+        return {
+            "selected_panelist_ids": [],
+            "selected_panelists": [],
+            "cohort_demographics_summary": {"error": str(exc)},
+            "agent_trace": [_trace_entry(f"Data layer error: {exc}", 0)],
+        }
+
+    panelists = panelists_frame.to_dict(orient="records")
+    embedding_info = await _enrich_with_clusters(repository, panelists_frame, panelists)
 
     # Step 1: Apply demographic filters
     filtered = _apply_filters(panelists, filters)
-
     if not filtered:
         logger.warning("cohort_selector_empty_after_filters", filters=filters)
         return {
             "selected_panelist_ids": [],
+            "selected_panelists": [],
             "cohort_demographics_summary": {"error": "No panelists match filters"},
             "agent_trace": [_trace_entry("No panelists match filters", 0)],
         }
 
-    # Step 2: Stratified sampling to ensure representativeness
-    selected = _stratified_sample(filtered, requested_size)
+    # Step 2: Stratified sampling across behavioral clusters
+    selected = _stratified_sample(filtered, requested_size, seed=state.get("random_seed"))
 
-    # Step 3: Compute cohort composition summary
+    # Step 3: Cohort composition summary
     summary = _compute_cohort_summary(selected)
 
     duration_ms = (time.perf_counter() - start_time) * 1000
@@ -88,97 +101,55 @@ async def cohort_selector_node(state: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "selected_panelist_ids": [p["panelist_id"] for p in selected],
+        "selected_panelists": selected,
         "cohort_demographics_summary": summary,
+        "embedding_info": embedding_info,
         "agent_trace": [_trace_entry(
             f"Selected {len(selected)} panelists from pool of {len(filtered)}",
             duration_ms,
-            metadata=summary,
+            metadata={**summary, "embedding_info": embedding_info},
         )],
     }
 
 
-async def _load_panelist_pool() -> list[dict[str, Any]]:
-    """Load the available panelist pool from the data layer.
+async def _enrich_with_clusters(
+    repository: Any,
+    panelists_frame: Any,
+    panelists: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Attach L2 behavioral cluster assignments to the panelist pool.
 
-    In demo mode, loads synthetic panelist data from CSV files.
-    In production mode, queries the database or API.
+    Best-effort by design: a missing purchase history downgrades the run
+    (no behavioral stratification, personas fall back to cluster 0)
+    instead of failing it.
 
-    Returns:
-        List of panelist dictionaries with demographics and
-        cluster assignments.
-    """
-    settings = get_settings()
-
-    if settings.is_demo():
-        return _load_synthetic_panelists()
-
-    # Production: load from database
-    # TODO: Implement database query via L1 data layer
-    return _load_synthetic_panelists()
-
-
-def _load_synthetic_panelists() -> list[dict[str, Any]]:
-    """Load synthetic panelists from the sample data files.
+    Args:
+        repository: L1 repository (purchases + data version).
+        panelists_frame: Panelist DataFrame (embedding engine input).
+        panelists: The same panelists as mutable records (enriched in place).
 
     Returns:
-        List of panelist dictionaries.
+        Embedding metadata for the audit trail (empty dict on skip).
     """
-    import pandas as pd
-
-    settings = get_settings()
-    panelist_file = settings.synthetic_data_dir / "panelists.csv"
-
-    if not panelist_file.exists():
-        logger.warning("synthetic_panelists_not_found", path=str(panelist_file))
-        # Return a minimal in-memory sample for first-run experience
-        return _generate_minimal_sample()
-
-    df = pd.read_csv(panelist_file)
-    return df.to_dict(orient="records")
-
-
-def _generate_minimal_sample() -> list[dict[str, Any]]:
-    """Generate a minimal panelist sample for first-run when no data files exist.
-
-    Creates 200 synthetic panelists with realistic demographic distributions.
-    This enables the system to run immediately after `docker compose up`
-    without requiring a separate data generation step.
-
-    Returns:
-        List of 200 panelist dictionaries.
-    """
-    rng = np.random.default_rng(42)
-    panelists = []
-
-    age_groups = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
-    age_weights = [0.12, 0.22, 0.20, 0.18, 0.15, 0.13]
-
-    income_groups = ["low", "lower_middle", "middle", "upper_middle", "high"]
-    income_weights = [0.15, 0.22, 0.30, 0.22, 0.11]
-
-    regions = ["northeast", "midwest", "south", "west"]
-    region_weights = [0.18, 0.21, 0.38, 0.23]
-
-    clusters = [0, 1, 2, 3, 4]
-    cluster_weights = [0.25, 0.15, 0.20, 0.25, 0.15]
-
-    for i in range(200):
-        panelists.append({
-            "panelist_id": f"HH_{i:04d}",
-            "age_group": rng.choice(age_groups, p=age_weights),
-            "income_group": rng.choice(income_groups, p=income_weights),
-            "region": rng.choice(regions, p=region_weights),
-            "household_size": rng.choice(["1", "2", "3-4", "5+"], p=[0.28, 0.34, 0.28, 0.10]),
-            "has_children": bool(rng.choice([True, False], p=[0.35, 0.65])),
-            "education_level": rng.choice(
-                ["high_school", "some_college", "bachelors", "masters", "doctorate"],
-                p=[0.25, 0.20, 0.30, 0.18, 0.07],
-            ),
-            "cluster_id": int(rng.choice(clusters, p=cluster_weights)),
-            "expansion_factor": float(rng.uniform(100, 2000)),
-        })
-
-    return panelists
+    try:
+        purchases = await repository.get_purchases()
+        engine = get_embedding_engine()
+        embeddings = engine.encode(purchases, panelists_frame)
+        clusters = engine.cluster(embeddings)
+        for record in panelists:
+            record["cluster_id"] = clusters.assignments.get(
+                str(record["panelist_id"]), 0
+            )
+        return {
+            "chosen_k": clusters.chosen_k,
+            "silhouette": round(clusters.silhouette, 4),
+            "embedding_dim": get_settings().embedding.embedding_dim,
+        }
+    except (DataLayerError, EmbeddingError) as exc:
+        logger.warning(
+            "cohort_selector_cluster_enrichment_skipped", error=str(exc)[:300]
+        )
+        return {}
 
 
 def _apply_filters(
@@ -207,15 +178,17 @@ def _apply_filters(
 def _stratified_sample(
     panelists: list[dict[str, Any]],
     target_size: int,
+    seed: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Perform stratified sampling to ensure demographic representativeness.
+    """Stratified sampling that preserves the cluster distribution.
 
-    Samples proportionally from each behavioral cluster, maintaining
-    the population-level cluster distribution.
+    Samples proportionally from each behavioral cluster, so the cohort's
+    archetype mix matches the (filtered) population's.
 
     Args:
         panelists: Filtered panelist pool.
         target_size: Desired cohort size.
+        seed: Optional random seed for reproducible cohorts.
 
     Returns:
         Stratified sample of panelists.
@@ -223,15 +196,12 @@ def _stratified_sample(
     if len(panelists) <= target_size:
         return panelists
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed)
 
-    # Group by cluster
     cluster_groups: dict[int, list[dict]] = {}
     for p in panelists:
-        cid = p.get("cluster_id", 0)
-        cluster_groups.setdefault(cid, []).append(p)
+        cluster_groups.setdefault(int(p.get("cluster_id", 0) or 0), []).append(p)
 
-    # Sample proportionally from each cluster
     selected: list[dict] = []
     for members in cluster_groups.values():
         proportion = len(members) / len(panelists)
@@ -241,10 +211,19 @@ def _stratified_sample(
         indices = rng.choice(len(members), size=n_from_cluster, replace=False)
         selected.extend(members[i] for i in indices)
 
-    # Adjust if we're over/under target
+    # Adjust if we're over target after per-cluster minimums
     if len(selected) > target_size:
         indices = rng.choice(len(selected), size=target_size, replace=False)
         selected = [selected[i] for i in indices]
+
+    # Per-cluster int() flooring can undershoot — top up from the remainder
+    # so the caller always gets exactly the requested cohort size.
+    if len(selected) < target_size:
+        chosen_ids = {p["panelist_id"] for p in selected}
+        remainder = [p for p in panelists if p["panelist_id"] not in chosen_ids]
+        top_up = min(target_size - len(selected), len(remainder))
+        indices = rng.choice(len(remainder), size=top_up, replace=False)
+        selected.extend(remainder[i] for i in indices)
 
     return selected
 
@@ -264,7 +243,7 @@ def _compute_cohort_summary(panelists: list[dict[str, Any]]) -> dict[str, Any]:
 
     def distribution(key: str) -> dict[str, float]:
         counts = Counter(p.get(key, "unknown") for p in panelists)
-        return {k: round(v / n * 100, 1) for k, v in sorted(counts.items())}
+        return {str(k): round(v / n * 100, 1) for k, v in sorted(counts.items())}
 
     return {
         "total": n,

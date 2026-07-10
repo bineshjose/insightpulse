@@ -35,7 +35,7 @@ from experiments.common import (
     setup_experiment,
 )
 from insightpulse import simulation
-from insightpulse.agents.calibration_agent import _sinkhorn_calibrate
+from insightpulse.layers.calibration_layer import SinkhornSolver, ordinal_cost_matrix
 from insightpulse.utils import metrics as m
 
 EPSILONS = [0.01, 0.05, 0.1, 0.5]
@@ -100,12 +100,16 @@ def run_sweep(seed: int) -> list[dict[str, Any]]:
         ws_before = m.wasserstein_distance(source, target)
 
         for eps in EPSILONS:
-            calibrated, info = _sinkhorn_calibrate(
-                source, target,
+            solver = SinkhornSolver(
                 epsilon=eps,
-                max_iter=MAX_ITER,
+                max_iterations=MAX_ITER,
                 threshold=CONVERGENCE_THRESHOLD,
             )
+            plan, info = solver.solve(
+                source, target, ordinal_cost_matrix(len(source))
+            )
+            calibrated = plan.sum(axis=0)
+            calibrated = calibrated / calibrated.sum()
             records.append({
                 "question_id": question["question_id"],
                 "num_options": len(question["options"]),
@@ -113,7 +117,7 @@ def run_sweep(seed: int) -> list[dict[str, Any]]:
                 "converged": info["converged"],
                 "iterations": info["iterations_used"],
                 "convergence_history": info["convergence_history"],
-                "plan_entropy": _plan_entropy(info["transport_plan"]),
+                "plan_entropy": _plan_entropy(plan),
                 "js_before": js_before,
                 "js_after": m.js_divergence(calibrated, target),
                 "wasserstein_before": ws_before,
@@ -170,7 +174,7 @@ def plot_convergence(records: list[dict[str, Any]]) -> plt.Figure:
         )
     ax1.set_title("Marginal error per iteration (q_organic)")
     ax1.set_xlabel("Sinkhorn iteration")
-    ax1.set_ylabel("max |u − u_prev| (log scale)")
+    ax1.set_ylabel("row-marginal violation (log scale)")
     ax1.legend(fontsize=8.5)
 
     # Panel 2: iterations to converge (mean over questions).

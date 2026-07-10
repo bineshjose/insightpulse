@@ -1,8 +1,18 @@
-"""AuditAgent — logs provenance and ensures reproducibility.
+"""AuditAgent — thin orchestration wrapper over L5, plus provenance.
 
-The final agent in the DAG. Compiles the complete execution trace,
-computes a provenance hash for reproducibility verification, and
-assembles the final SurveyResult objects.
+Delegates result compilation to the environment's
+:class:`~insightpulse.layers.insight_layer.InsightEngine` (per-question
+distributions, entropy, demographic breakdowns in production) and keeps
+what is genuinely the auditor's job: the provenance hash that makes a run
+replayable, and the run-level quality rates computed over ALL responses —
+including rejected ones, which the analytics layer never sees.
+
+State contract (unchanged since Stage 1):
+    reads  ``parsed_questions``, ``validated_responses``,
+           ``rejected_responses``, ``calibrated_distributions``,
+           ``calibration_metrics``, request fields for provenance
+    writes ``results``, ``insight_report``, ``provenance_hash``,
+           ``hallucination_rate``, ``consistency_score``, ``status``.
 """
 
 from __future__ import annotations
@@ -12,16 +22,15 @@ import json
 import time
 from typing import Any
 
-import structlog
+from insightpulse.layers import get_insight_engine
+from insightpulse.utils import metrics as m
+from insightpulse.utils.logging import get_logger
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 async def audit_agent_node(state: dict[str, Any]) -> dict[str, Any]:
     """LangGraph node: compile audit log and finalize results.
-
-    Assembles the final survey results from all agent outputs,
-    computes a provenance hash, and prepares the complete run record.
 
     Args:
         state: Current pipeline state.
@@ -31,34 +40,30 @@ async def audit_agent_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     start_time = time.perf_counter()
 
-    # Compile final results per question
     questions = state.get("parsed_questions", [])
     responses = state.get("validated_responses", [])
+    rejected = state.get("rejected_responses", [])
     calibrated = state.get("calibrated_distributions", {})
     cal_metrics = state.get("calibration_metrics", [])
     entropy = state.get("response_entropy", {})
 
+    # L5 compiles the per-question analytics; the auditor attaches the
+    # calibration evidence and diversity numbers recorded earlier in state.
+    report = get_insight_engine().analyze(questions, responses, calibrated)
     results = []
-    for question in questions:
-        qid = question["question_id"]
-        q_responses = [r for r in responses if r.get("question_id") == qid]
-
-        result = {
-            "question_id": qid,
-            "question_text": question["text"],
-            "total_responses": len(q_responses),
-            "valid_responses": sum(1 for r in q_responses if r.get("is_valid", True)),
-            "options": question.get("options", []),
-            "distribution": _build_distribution(q_responses, question.get("options", [])),
-            "calibrated_distribution": calibrated.get(qid),
-            "entropy": entropy.get(qid, 0.0),
+    for question_result in report["results"]:
+        question_id = question_result["question_id"]
+        results.append({
+            **question_result,
+            "entropy": entropy.get(question_id, question_result.get("entropy", 0.0)),
             "calibration_metrics": next(
-                (m for m in cal_metrics if m.get("question_id") == qid), None
+                (entry for entry in cal_metrics
+                 if entry.get("question_id") == question_id),
+                None,
             ),
-        }
-        results.append(result)
+        })
 
-    # Compute provenance hash for reproducibility
+    # Provenance hash: the exact request fingerprint needed for replay.
     provenance_input = json.dumps({
         "questions": state.get("raw_questions", []),
         "cohort_size": state.get("requested_cohort_size"),
@@ -68,13 +73,11 @@ async def audit_agent_node(state: dict[str, Any]) -> dict[str, Any]:
     }, sort_keys=True)
     provenance_hash = hashlib.sha256(provenance_input.encode()).hexdigest()[:16]
 
-    # Compute overall run metrics
-    hallucination_count = sum(
-        1 for r in responses
-        if "hallucination_detected" in r.get("validation_flags", [])
-    )
-    total_responses = len(responses) + len(state.get("rejected_responses", []))
-    hallucination_rate = hallucination_count / total_responses if total_responses > 0 else 0
+    # Quality rates over ALL generated responses — the analytics layer only
+    # sees validated ones, but audit answers "how often did twins fail".
+    all_responses = [*responses, *rejected]
+    hallucination_rate = m.hallucination_rate(all_responses)
+    consistency_score = m.consistency_score(all_responses)
 
     duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -87,10 +90,11 @@ async def audit_agent_node(state: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "results": results,
+        "insight_report": report,
         "provenance_hash": provenance_hash,
         "status": "completed",
         "hallucination_rate": hallucination_rate,
-        "consistency_score": 1.0 - hallucination_rate,
+        "consistency_score": consistency_score,
         "agent_trace": [{
             "agent_name": "AuditAgent",
             "action": "finalize_results",
@@ -106,45 +110,3 @@ async def audit_agent_node(state: dict[str, Any]) -> dict[str, Any]:
             },
         }],
     }
-
-
-def _build_distribution(
-    responses: list[dict[str, Any]],
-    options: list[str],
-) -> list[dict[str, Any]]:
-    """Build response distribution from validated responses.
-
-    Args:
-        responses: List of validated response dicts.
-        options: List of response options.
-
-    Returns:
-        List of distribution entries with counts and percentages.
-    """
-    if not options:
-        return []
-
-    counts = {opt: 0 for opt in options}
-    total = len(responses)
-    by_lowered = {opt.lower().strip(): opt for opt in options}
-
-    for resp in responses:
-        answer = resp.get("answer", "").strip().lower()
-        # Exact match wins; substring fallback would otherwise misassign
-        # (e.g., "agree" is a substring of "disagree").
-        if answer in by_lowered:
-            counts[by_lowered[answer]] += 1
-            continue
-        for opt in options:
-            if opt.lower() in answer or answer in opt.lower():
-                counts[opt] += 1
-                break
-
-    return [
-        {
-            "option": opt,
-            "count": count,
-            "percentage": round(count / total * 100, 1) if total > 0 else 0,
-        }
-        for opt, count in counts.items()
-    ]
