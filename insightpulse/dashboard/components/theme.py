@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pandas as pd
 import streamlit as st
 
 # ---------------------------------------------------------------------------
@@ -76,8 +77,39 @@ TIER_COLORS = {
 _FOOTER_TEXT = (
     "InsightPulse v1.0.0 &nbsp;|&nbsp; M.Tech Industrial AI Thesis — "
     "IIT Madras × NielsenIQ &nbsp;|&nbsp; Binesh Jose (CH24M521) "
-    "&nbsp;|&nbsp; © 2025"
+    "&nbsp;|&nbsp; © 2025-2026"
 )
+
+# Human-readable labels for machine-named table columns (used by
+# :func:`humanize_columns`). Anything not listed falls back to Title Case.
+COLUMN_LABELS: dict[str, str] = {
+    "run_id": "Run ID",
+    "model": "Model",
+    "cohort": "Cohort",
+    "cohort_size": "Cohort Size",
+    "created": "Created",
+    "created_at": "Created",
+    "js": "JS Divergence",
+    "js_divergence": "JS Divergence",
+    "wasserstein": "Wasserstein",
+    "wasserstein_distance": "Wasserstein",
+    "shannon_entropy": "Entropy (bits)",
+    "entropy_bits": "Entropy (bits)",
+    "normalized_entropy": "Normalized Entropy",
+    "hallucination": "Hallucination Rate",
+    "hallucination_rate": "Hallucination Rate",
+    "consistency_score": "Consistency",
+    "cost": "Cost (USD)",
+    "cost_usd": "Cost (USD)",
+    "hash": "Provenance Hash",
+    "option": "Option",
+    "question": "Question",
+    "verdict": "Verdict",
+    "month": "Month",
+    "conditioning": "Conditioning",
+    "consistency": "Consistency",
+    "source": "Source",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +131,37 @@ html, body, [data-testid="stAppViewContainer"] {{
 h1, h2, h3 {{ color: {NAVY}; font-family: {FONT_STACK}; }}
 a {{ color: {BLUE}; }}
 
+/* ---- chrome cleanup: no deploy/stop widgets, no footer branding ---- */
+[data-testid="stAppDeployButton"], .stAppDeployButton {{ display: none !important; }}
+[data-testid="stStatusWidget"] {{ visibility: hidden; }}
+footer {{ visibility: hidden; }}
+
+/* Content starts high: trim the default gap above the breadcrumb. */
+[data-testid="stAppViewContainer"] .block-container {{
+    padding-top: 1.2rem;
+}}
+
+/* Hide the "Press Enter to submit/apply" hints on every input. */
+[data-testid="InputInstructions"] {{ display: none; }}
+
 /* ---- sidebar ---- */
 [data-testid="stSidebar"] {{
     background: linear-gradient(180deg, {NAVY} 0%, {NAVY_LIGHT} 100%);
+}}
+/* Brand logo sits at the very top of the sidebar, above navigation,
+   on a white chip (the wordmark is navy), with a divider underneath. */
+[data-testid="stSidebarHeader"] {{
+    padding: 0.9rem 1rem 0.8rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    margin-bottom: 0.4rem;
+}}
+[data-testid="stSidebarHeader"] img, [data-testid="stLogo"] {{
+    width: 180px !important;
+    max-width: 100%;
+    height: auto !important;
+    background: #FFFFFF;
+    padding: 7px 9px;
+    border-radius: 10px;
 }}
 [data-testid="stSidebar"] * {{ color: #FFFFFF; }}
 [data-testid="stSidebar"] a:hover {{ color: {BLUE} !important; }}
@@ -231,10 +291,9 @@ div[data-baseweb="notification"] {{ border-radius: 10px; }}
 }}
 .niq-kpi .kpi-label {{
     color: {TEXT_SECONDARY};
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
 }}
 .niq-kpi .kpi-value {{
     color: {TEXT};
@@ -306,13 +365,17 @@ def kpi_card(
         label: Small uppercase label.
         value: Big number/string.
         delta: Optional secondary line (trend, target note).
-        status: 'good' | 'warn' | 'bad' | 'info' — colors the left border.
+        status: 'good' | 'warn' | 'bad' | 'info' | 'neutral' — colors the
+            left border ('neutral' is navy: informational, no judgment).
 
     Returns:
         HTML string for the card.
     """
-    border = {"good": GREEN, "warn": AMBER, "bad": RED, "info": BLUE}[status]
-    delta_color = {"good": GREEN, "warn": AMBER, "bad": RED, "info": TEXT_SECONDARY}[status]
+    border = {"good": GREEN, "warn": AMBER, "bad": RED, "info": BLUE, "neutral": NAVY}[status]
+    delta_color = {
+        "good": GREEN, "warn": AMBER, "bad": RED,
+        "info": TEXT_SECONDARY, "neutral": TEXT_SECONDARY,
+    }[status]
     delta_html = (
         f'<div class="kpi-delta" style="color:{delta_color}">{delta}</div>'
         if delta else ""
@@ -339,3 +402,88 @@ def footer() -> None:
 def current_date_line() -> str:
     """Human-readable current date for the welcome banner."""
     return datetime.now().strftime("%A, %d %B %Y")
+
+
+def format_timestamp(iso_timestamp: str) -> str:
+    """Format an ISO timestamp as e.g. "Jul 11, 2026 · 12:04 AM UTC".
+
+    Args:
+        iso_timestamp: ISO-8601 string (with or without timezone offset).
+
+    Returns:
+        Human-readable timestamp; the input unchanged if it cannot be parsed.
+    """
+    try:
+        parsed = datetime.fromisoformat(iso_timestamp)
+    except ValueError:
+        return iso_timestamp
+    suffix = " UTC" if parsed.tzinfo is not None else ""
+    return parsed.strftime("%b %d, %Y · %I:%M %p") + suffix
+
+
+def run_label(run_id: str) -> str:
+    """Short display form of a run ID: "Run #2605" (first 4 chars, upper)."""
+    return f"Run #{run_id[:4].upper()}"
+
+
+def fmt_metric(value: float, decimals: int = 4) -> str:
+    """Format a small metric with enough significant digits to be non-zero.
+
+    Values that would round to all zeros at the requested precision switch
+    to scientific notation instead of displaying a misleading "0.0000".
+
+    Args:
+        value: Metric value.
+        decimals: Fixed decimal places for normal-range values.
+
+    Returns:
+        Formatted string.
+    """
+    if value != 0 and abs(value) < 10 ** -decimals:
+        return f"{value:.1e}"
+    return f"{value:.{decimals}f}"
+
+
+def humanize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename machine-named (snake_case) columns to human-readable labels.
+
+    Args:
+        df: Any DataFrame headed for display.
+
+    Returns:
+        A renamed copy (COLUMN_LABELS mapping, Title Case fallback).
+    """
+    return df.rename(columns={
+        col: COLUMN_LABELS.get(col, col.replace("_", " ").title())
+        for col in df.columns
+    })
+
+
+def usage_color(fraction_used: float) -> str:
+    """Status color for a consumption bar: navy, amber ≥ 75%, red ≥ 90%."""
+    if fraction_used >= 0.90:
+        return RED
+    if fraction_used >= 0.75:
+        return AMBER
+    return NAVY
+
+
+def usage_bar(used: int, total: int, label: str) -> str:
+    """HTML consumption bar that shifts navy → amber → red as usage grows.
+
+    Args:
+        used: Units consumed.
+        total: Units in the quota.
+        label: Caption under the bar.
+
+    Returns:
+        HTML string (render with st.markdown, unsafe_allow_html=True).
+    """
+    fraction = min(max(used / max(total, 1), 0.0), 1.0)
+    color = usage_color(fraction)
+    return (
+        f'<div style="background:{BORDER}; border-radius:99px; height:8px; margin:4px 0 2px;">'
+        f'<div style="background:{color}; width:{fraction:.0%}; height:8px;'
+        f' border-radius:99px;"></div></div>'
+        f'<div style="color:{TEXT_SECONDARY}; font-size:0.8rem;">{label}</div>'
+    )

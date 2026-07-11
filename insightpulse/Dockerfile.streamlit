@@ -22,6 +22,7 @@ COPY src/ /app/src/
 RUN pip install --no-cache-dir .
 
 COPY dashboard/ /app/dashboard/
+COPY .streamlit/ /app/.streamlit/
 COPY config/ /app/config/
 COPY data/ /app/data/
 

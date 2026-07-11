@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Client-side auth context with the same three demo accounts as the
+ * Client-side auth context with the same demo accounts as the
  * Streamlit dashboard (components/auth.py). Deliberately NOT a security
  * boundary — the production tool authenticates at the ingress; this
  * context provides the session + role model the UI is built around.
@@ -36,18 +36,36 @@ const ACCOUNTS: Account[] = [
     permissions: ["view", "create", "run", "analyze", "export", "calibrate"],
     tier: "Enterprise",
     creditsTotal: 3000,
-    creditsBalance: 2500,
-    apiCallsRemaining: 10000,
+    creditsBalance: 1847,
+    apiCallsRemaining: 3247,
     apiCallsQuota: 10000,
     maxCohortSize: 5000,
     created: "2025-08-14",
+  },
+  {
+    email: "analyst@nielseniq.com",
+    password: "analyst123",
+    name: "Priya Sharma",
+    initials: "PS",
+    role: "Survey Analyst",
+    title: "Consumer Research Analyst",
+    department: "Market Research — FMCG Division",
+    regions: ["APAC"],
+    permissions: ["view", "create", "run", "analyze"],
+    tier: "Professional",
+    creditsTotal: 3000,
+    creditsBalance: 1850,
+    apiCallsRemaining: 6753,
+    apiCallsQuota: 10000,
+    maxCohortSize: 1000,
+    created: "2025-10-21",
   },
   {
     email: "evaluator@iitm.ac.in",
     password: "eval2024",
     name: "External Evaluator",
     initials: "EV",
-    role: "Read-Only Analyst",
+    role: "Read-Only Evaluator",
     title: "Faculty Reviewer",
     department: "Academic Review Board",
     regions: ["APAC"],

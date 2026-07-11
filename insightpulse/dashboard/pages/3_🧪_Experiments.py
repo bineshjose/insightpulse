@@ -1,10 +1,11 @@
 """Experiments — multi-LLM comparison, calibration convergence, drift, sequence.
 
-Addresses evaluator feedback directly:
-- #1 Multi-LLM comparison: same survey run across every routed model.
-- #2 Retraining pipeline: rolling drift detection with an explicit trigger.
-- #3 Sequential question dependency: consistency with/without prior-answer
+Covers the four standing experiment tracks:
+- Multi-LLM comparison: same survey run across every routed model.
+- Retraining pipeline: rolling drift detection with an explicit trigger.
+- Sequential question dependency: consistency with/without prior-answer
   conditioning.
+- BDCL calibration convergence across regularization strengths.
 """
 
 import sys
@@ -19,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from components import auth, data_loader, simulation, theme
 from components.charts import (
     MODEL_COLORS,
+    PLOTLY_CONFIG,
     convergence_chart,
     drift_chart,
     metric_comparison_chart,
@@ -27,15 +29,11 @@ from components.charts import (
 sys.path.insert(0, str(data_loader.REPO_ROOT / "src"))
 from insightpulse.utils import metrics as m
 
-st.set_page_config(page_title="Experiments | InsightPulse", page_icon="🧪", layout="wide")
-
-user = auth.require_auth("run")
-theme.apply()
-auth.render_sidebar(user)
+user = auth.require_page("experiments")
 theme.page_header(
-    "🧪 Experiments",
+    "Experiments",
     "Multi-LLM comparison, calibration convergence, drift monitoring, and "
-    "sequential-dependency analysis — each answering an evaluator question.",
+    "sequential-dependency analysis.",
     "Experiments",
 )
 
@@ -47,7 +45,7 @@ panelists = data_loader.load_panelists()
 catalog = data_loader.question_catalog()
 
 # ---------------------------------------------------------------------------
-# 1 · Multi-LLM comparison (evaluator feedback #1)
+# 1 · Multi-LLM comparison
 # ---------------------------------------------------------------------------
 
 st.header("1 · Multi-LLM comparison")
@@ -57,33 +55,35 @@ st.markdown(
     "variable."
 )
 
-col1, col2 = st.columns(2)
-with col1:
-    llm_cohort_size = st.slider("Cohort size", 50, 500, 200, 50, key="llm_cohort")
-with col2:
-    llm_seed = st.number_input("Seed", value=42, min_value=0, key="llm_seed")
+llm_cohort_size = st.slider("Cohort size", 50, 500, 200, 50, key="llm_cohort")
+with st.expander("⚙ Advanced settings"):
+    llm_seed = st.number_input(
+        "Random seed", value=42, min_value=0, key="llm_seed",
+        help="Fixes the sampling so the comparison can be reproduced exactly.",
+    )
 
 if st.button("▶ Run comparison", key="run_llm"):
     cohort = panelists.sample(n=llm_cohort_size, random_state=int(llm_seed))
     rows = []
-    progress = st.progress(0.0)
     models = list(simulation.MODEL_PROFILES)
-    for i, model in enumerate(models):
-        run = simulation.simulate_survey_run(
-            catalog, cohort, model, seed=int(llm_seed), calibrate=True
-        )
-        met = pd.DataFrame([r["metrics_calibrated"] for r in run["question_results"]])
-        rows.append({
-            "model": model,
-            "js_divergence": met["js_divergence"].mean(),
-            "wasserstein_distance": met["wasserstein_distance"].mean(),
-            "shannon_entropy": met["shannon_entropy"].mean(),
-            "hallucination_rate": run["totals"]["hallucination_rate"],
-            "consistency_score": run["totals"]["consistency_score"],
-            "cost_usd": run["totals"]["total_cost_usd"],
-        })
-        progress.progress((i + 1) / len(models))
-    progress.empty()
+    with st.spinner("Running the survey across all models..."):
+        progress = st.progress(0.0)
+        for i, model in enumerate(models):
+            run = simulation.simulate_survey_run(
+                catalog, cohort, model, seed=int(llm_seed), calibrate=True
+            )
+            met = pd.DataFrame([r["metrics_calibrated"] for r in run["question_results"]])
+            rows.append({
+                "model": model,
+                "js_divergence": met["js_divergence"].mean(),
+                "wasserstein_distance": met["wasserstein_distance"].mean(),
+                "shannon_entropy": met["shannon_entropy"].mean(),
+                "hallucination_rate": run["totals"]["hallucination_rate"],
+                "consistency_score": run["totals"]["consistency_score"],
+                "cost_usd": run["totals"]["total_cost_usd"],
+            })
+            progress.progress((i + 1) / len(models))
+        progress.empty()
     st.session_state["llm_comparison"] = pd.DataFrame(rows)
     auth.record_activity(
         "Ran experiment", f"Multi-LLM Comparison ({len(models)} models, seed {llm_seed})"
@@ -97,35 +97,38 @@ if "llm_comparison" in st.session_state:
     with c1:
         st.plotly_chart(metric_comparison_chart(
             comparison, "model", "js_divergence", MODEL_COLORS,
-            "JS divergence after calibration (lower is better)",
-        ), use_container_width=True)
+            "JS divergence after calibration (lower is better)", value_format=".4f",
+        ), use_container_width=True, config=PLOTLY_CONFIG)
         st.plotly_chart(metric_comparison_chart(
             comparison, "model", "hallucination_rate", MODEL_COLORS,
             "Hallucination rate (lower is better)", value_format=".1%",
-        ), use_container_width=True)
+        ), use_container_width=True, config=PLOTLY_CONFIG)
     with c2:
         st.plotly_chart(metric_comparison_chart(
             comparison, "model", "wasserstein_distance", MODEL_COLORS,
-            "Wasserstein distance (lower is better)",
-        ), use_container_width=True)
+            "Wasserstein distance (lower is better)", value_format=".4f",
+        ), use_container_width=True, config=PLOTLY_CONFIG)
         st.plotly_chart(metric_comparison_chart(
             comparison, "model", "consistency_score", MODEL_COLORS,
             "Logical consistency (higher is better)", value_format=".1%",
-        ), use_container_width=True)
+        ), use_container_width=True, config=PLOTLY_CONFIG)
 
     with st.expander("Table view — all metrics"):
         st.dataframe(
-            comparison.style.format({
-                "js_divergence": "{:.4f}", "wasserstein_distance": "{:.4f}",
-                "shannon_entropy": "{:.2f}", "hallucination_rate": "{:.2%}",
-                "consistency_score": "{:.2%}", "cost_usd": "${:.2f}",
+            theme.humanize_columns(comparison).style.format({
+                "JS Divergence": theme.fmt_metric,
+                "Wasserstein": theme.fmt_metric,
+                "Entropy (bits)": "{:.2f}",
+                "Hallucination Rate": "{:.2%}",
+                "Consistency": "{:.2%}",
+                "Cost (USD)": "${:.2f}",
             }),
             use_container_width=True, hide_index=True,
         )
     st.caption(
-        "Calibration parameters are re-fit per model (evaluator feedback #6): "
-        "each model's mode-collapse severity changes the Sinkhorn transport "
-        "plan, so BDCL weights are model-specific, never shared."
+        "Calibration parameters are re-fit per model: each model's "
+        "mode-collapse severity changes the Sinkhorn transport plan, so "
+        "BDCL weights are model-specific, never shared."
     )
 else:
     st.info("Press **Run comparison** to execute the survey across all models.")
@@ -167,7 +170,7 @@ convergence = pd.DataFrame(records)
 st.plotly_chart(convergence_chart(
     convergence, "iteration", "js", "epsilon",
     "Residual JS divergence by Sinkhorn iteration", "JS divergence", log_y=True,
-), use_container_width=True)
+), use_container_width=True, config=PLOTLY_CONFIG)
 st.caption(
     "Production setting: ε = 0.1 (converges in ≈80 iterations to JS ≈ 0.017, "
     "matching the thesis result) — the best fidelity/runtime trade-off."
@@ -176,7 +179,7 @@ st.caption(
 st.divider()
 
 # ---------------------------------------------------------------------------
-# 3 · Drift detection & retraining triggers (evaluator feedback #2)
+# 3 · Drift detection & retraining triggers
 # ---------------------------------------------------------------------------
 
 st.header("3 · Behavioral drift & retraining triggers")
@@ -209,7 +212,7 @@ drift = pd.DataFrame(drift_rows)
 st.plotly_chart(drift_chart(
     drift, "month", "js", DRIFT_TRIGGER,
     "Category-mix drift vs. 3-month baseline", "JS divergence",
-), use_container_width=True)
+), use_container_width=True, config=PLOTLY_CONFIG)
 
 with st.expander("Retraining pipeline definition"):
     st.markdown(f"""
@@ -225,7 +228,7 @@ with st.expander("Retraining pipeline definition"):
 st.divider()
 
 # ---------------------------------------------------------------------------
-# 4 · Sequential question dependency (evaluator feedback #3)
+# 4 · Sequential question dependency
 # ---------------------------------------------------------------------------
 
 st.header("4 · Sequential question dependency")
@@ -244,11 +247,15 @@ with col1:
     st.plotly_chart(metric_comparison_chart(
         seq, "conditioning", "consistency",
         {"With prior-answer context": MODEL_COLORS["claude-sonnet-4-6"],
-         "Independent generation": "#898781"},
+         "Independent generation": theme.AMBER},
         "Cross-question logical consistency", value_format=".1%",
-    ), use_container_width=True)
+    ), use_container_width=True, config=PLOTLY_CONFIG)
 with col2:
-    st.metric("Consistency gain", "+13.4 pp", "from sequential conditioning")
+    st.metric(
+        "Consistency gain", "+13.4 pp",
+        "percentage points, from sequential conditioning",
+        delta_color="off",
+    )
     st.caption(
         "Example: a twin answering “Rarely” to purchase frequency no longer "
         "reports being “Extremely” affected by snack promotions. Prior "

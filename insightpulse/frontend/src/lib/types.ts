@@ -146,7 +146,7 @@ export type Permission =
 
 export type UserRole =
   | "Platform Administrator"
-  | "Read-Only Analyst"
+  | "Read-Only Evaluator"
   | "Survey Analyst";
 
 export interface User {

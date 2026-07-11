@@ -39,6 +39,17 @@ STATUS: dict[str, str] = {
     "critical": "#E03C31",
 }
 
+# Shared st.plotly_chart config: keep only PNG download, zoom, and reset —
+# the full Plotly toolbar (lasso, box select, spike lines…) reads as clutter.
+PLOTLY_CONFIG: dict = {
+    "displaylogo": False,
+    "modeBarButtonsToRemove": [
+        "lasso2d", "select2d", "pan2d", "autoScale2d",
+        "zoomIn2d", "zoomOut2d", "hoverClosestCartesian",
+        "hoverCompareCartesian", "toggleSpikelines",
+    ],
+}
+
 # Chart chrome (light surface).
 GRIDLINE = "#E5E7EB"
 AXIS_LINE = "#CBD2D9"
@@ -61,16 +72,14 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
         The styled figure (same object, for chaining).
     """
     fig.update_layout(
-        title=title,
         height=height,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={"family": FONT_FAMILY, "color": SECONDARY_INK, "size": 12},
-        title_font={"color": "#003865", "size": 15},
         margin={"l": 8, "r": 8, "t": 48 if title else 16, "b": 8},
         legend={
             "orientation": "h",
-            "yanchor": "bottom", "y": 1.0,
+            "yanchor": "bottom", "y": 1.02,
             "xanchor": "left", "x": 0.0,
             "font": {"color": SECONDARY_INK},
         },
@@ -78,15 +87,20 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
         bargroupgap=0.12,
         hoverlabel={"font": {"family": FONT_FAMILY}},
     )
+    # Only set a title when one exists — a None title leaves stray
+    # "undefined" text in the rendered chart on some plotly.js builds.
+    if title:
+        fig.update_layout(title=title, title_font={"color": "#003865", "size": 15})
     fig.update_xaxes(
         showgrid=False, linecolor=AXIS_LINE, linewidth=1,
         tickfont={"color": MUTED_INK, "size": 11},
-        title_font={"color": MUTED_INK, "size": 12},
+        title_font={"color": MUTED_INK, "size": 13},
     )
     fig.update_yaxes(
         gridcolor=GRIDLINE, gridwidth=1, zeroline=False,
         showline=False, tickfont={"color": MUTED_INK, "size": 11},
-        title_font={"color": MUTED_INK, "size": 12},
+        title_font={"color": MUTED_INK, "size": 13},
+        exponentformat="none",
     )
     # Rounded data-ends (supported by plotly >= 5.19; skip silently on older).
     with contextlib.suppress(ValueError):
@@ -170,6 +184,9 @@ def metric_comparison_chart(
     ))
     fig = apply_base_layout(fig, title, height=320)
     fig.update_layout(showlegend=False)
+    # Ticks share the direct-label format so tiny values (e.g. JS divergence
+    # ≈ 0.0004) never collapse to "0.000" or SI micro notation.
+    fig.update_yaxes(tickformat=value_format)
     return fig
 
 
@@ -239,6 +256,13 @@ def drift_chart(
         A styled plotly figure.
     """
     fig = go.Figure()
+    # Red-tinted danger zone above the trigger, so the threshold reads at
+    # a glance (band + line + labeled breach markers).
+    ceiling = max(float(df[y_col].max()) * 1.25, threshold * 2.0)
+    fig.add_hrect(
+        y0=threshold, y1=ceiling,
+        fillcolor="rgba(224, 60, 49, 0.07)", line_width=0, layer="below",
+    )
     fig.add_scatter(
         x=df[x_col], y=df[y_col],
         mode="lines+markers",
@@ -268,7 +292,7 @@ def drift_chart(
         annotation_position="top left",
     )
     fig = apply_base_layout(fig, title)
-    fig.update_yaxes(title=y_title)
+    fig.update_yaxes(title=y_title, range=[0, ceiling])
     return fig
 
 

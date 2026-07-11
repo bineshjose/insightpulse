@@ -11,15 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from components import auth, theme
 
-st.set_page_config(page_title="Profile — InsightPulse", page_icon="👤", layout="wide")
-
-user = auth.require_auth()
-theme.apply()
-auth.render_sidebar(user)
+user = auth.require_page("profile")
 theme.page_header("User Profile", "Account, preferences, and usage.", "Profile")
 
 prefs = st.session_state["user_prefs"]
-avatar_color = theme.TIER_COLORS.get(user["tier"], theme.BLUE)
 
 # ---------------------------------------------------------------------------
 # Profile card
@@ -28,7 +23,8 @@ avatar_color = theme.TIER_COLORS.get(user["tier"], theme.BLUE)
 st.markdown(
     f"""
 <div class="niq-card" style="display:flex; align-items:center; gap:1.4rem;">
-  <div style="width:88px; height:88px; border-radius:50%; background:{avatar_color};
+  <div style="width:88px; height:88px; border-radius:50%;
+              background:linear-gradient(135deg, {theme.NAVY} 0%, {theme.BLUE} 100%);
               color:#FFFFFF; display:flex; align-items:center; justify-content:center;
               font-weight:800; font-size:2rem; flex-shrink:0;">{user["initials"]}</div>
   <div style="line-height:1.5;">
@@ -108,19 +104,25 @@ with info_col:
         f"**Credit balance** — {user['credits_balance']:,} of "
         f"{user['credits_total']:,} remaining"
     )
-    st.progress(credits_used / user["credits_total"],
-                text=f"{credits_used:,} credits consumed")
+    st.markdown(
+        theme.usage_bar(credits_used, user["credits_total"],
+                        f"{credits_used:,} credits consumed"),
+        unsafe_allow_html=True,
+    )
 
     calls_used = user["api_calls_quota"] - user["api_calls_remaining"]
     st.markdown(
-        f"**API calls** — {user['api_calls_remaining']:,} of "
-        f"{user['api_calls_quota']:,} remaining this month"
+        f"**API calls** — {calls_used:,} of "
+        f"{user['api_calls_quota']:,} used this month"
     )
-    st.progress(max(calls_used / user["api_calls_quota"], 0.02),
-                text=f"{calls_used:,} calls used")
+    st.markdown(
+        theme.usage_bar(calls_used, user["api_calls_quota"],
+                        f"{user['api_calls_remaining']:,} calls remaining"),
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
-        f"<div style='color:{theme.TEXT_SECONDARY}; font-size:0.85rem;'>"
+        f"<div style='color:{theme.TEXT_SECONDARY}; font-size:0.85rem; margin-top:0.6rem;'>"
         f"Account created: {user['created']} &nbsp;·&nbsp; "
         f"Last login: {user['last_login']}</div>",
         unsafe_allow_html=True,
@@ -139,8 +141,10 @@ st.markdown("")
 st.markdown("### Usage statistics")
 
 _WEEKS = ["W1", "W2", "W3", "W4", "W5", "W6"]
-_SURVEY_TREND = [3, 5, 4, 7, 6, 9]
-_RESPONSE_TREND = [420, 780, 610, 1240, 980, 1660]
+_SURVEY_TREND = [8, 11, 9, 12, 10, 14]
+_RESPONSE_TREND = [640, 1120, 890, 1710, 1980, 2560]
+_MONTH_SURVEYS = _SURVEY_TREND[-1]
+_MONTH_RESPONSES = _RESPONSE_TREND[-1]
 history = st.session_state.get("run_history", [])
 live_responses = sum(r["totals"]["total_responses"] for r in history)
 
@@ -150,7 +154,7 @@ def _sparkline(values: list[int], color: str) -> go.Figure:
     fig = go.Figure(go.Scatter(
         x=_WEEKS, y=values, mode="lines",
         line={"color": color, "width": 2.2},
-        fill="tozeroy", fillcolor="rgba(0,164,228,0.08)",
+        fill="tozeroy", fillcolor="rgba(0,164,228,0.10)",
         hovertemplate="%{x}: %{y}<extra></extra>",
     ))
     fig.update_layout(
@@ -165,24 +169,27 @@ def _sparkline(values: list[int], color: str) -> go.Figure:
 u1, u2, u3 = st.columns(3)
 with u1:
     st.markdown(theme.kpi_card(
-        "Surveys this month", str(_SURVEY_TREND[-1] + len(history)),
+        "Surveys this month", str(_MONTH_SURVEYS + len(history)),
         "6-week trend below", "info"), unsafe_allow_html=True)
     st.plotly_chart(_sparkline(_SURVEY_TREND, theme.BLUE),
                     use_container_width=True, config={"displayModeBar": False})
 with u2:
     st.markdown(theme.kpi_card(
-        "Responses generated", f"{_RESPONSE_TREND[-1] + live_responses:,}",
+        "Responses generated", f"{_MONTH_RESPONSES + live_responses:,}",
         "6-week trend below", "info"), unsafe_allow_html=True)
     st.plotly_chart(_sparkline(_RESPONSE_TREND, theme.BLUE),
                     use_container_width=True, config={"displayModeBar": False})
 with u3:
+    credits_used = user["credits_total"] - user["credits_balance"]
     st.markdown(theme.kpi_card(
-        "Credits consumed", f"{user['credits_total'] - user['credits_balance']:,}",
+        "Credits consumed", f"{credits_used:,}",
         f"of {user['credits_total']:,} total",
         "warn" if user["credits_balance"] < 0.2 * user["credits_total"] else "info",
     ), unsafe_allow_html=True)
-    st.progress(
-        (user["credits_total"] - user["credits_balance"]) / user["credits_total"]
+    st.markdown(
+        theme.usage_bar(credits_used, user["credits_total"],
+                        f"{credits_used / user['credits_total']:.0%} of quota"),
+        unsafe_allow_html=True,
     )
 
 f1, f2 = st.columns(2)

@@ -83,9 +83,10 @@ Both frontends are auth-gated with the same demo accounts:
 
 | Account | Email | Password | Access |
 |---|---|---|---|
-| Administrator | `binesh.jose@nielseniq.com` | `Ch24m521` | Full (create/run/analyze/export/calibrate) |
-| Evaluator | `evaluator@iitm.ac.in` | `eval2024` | View & analyze only |
-| Demo analyst | `demo@insightpulse.ai` | `demo123` | Create/run/analyze (no export) |
+| Administrator | `binesh.jose@nielseniq.com` | `Ch24m521` | All pages; full permissions (create/run/analyze/export/calibrate) |
+| Survey analyst | `analyst@nielseniq.com` | `analyst123` | Survey Runner, Results, Profile |
+| Evaluator | `evaluator@iitm.ac.in` | `eval2024` | All pages read-only (Run Survey disabled) |
+| Demo analyst | `demo@insightpulse.ai` | `demo123` | Survey Runner, Results, Profile (no export) |
 
 Real LLM generation routes through LiteLLM (Claude, OpenAI, Ollama). Without API
 keys, every dashboard page and experiment still works through the built-in

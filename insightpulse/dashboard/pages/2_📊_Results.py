@@ -14,15 +14,11 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from components import auth, data_loader, simulation, theme
-from components.charts import CATEGORICAL, distribution_chart
+from components.charts import CATEGORICAL, PLOTLY_CONFIG, distribution_chart
 
-st.set_page_config(page_title="Results | InsightPulse", page_icon="📊", layout="wide")
-
-user = auth.require_auth("analyze")
-theme.apply()
-auth.render_sidebar(user)
+user = auth.require_page("results")
 theme.page_header(
-    "📊 Survey Results",
+    "Survey Results",
     "Raw vs calibrated vs empirical distributions, the full metric suite, "
     "and demographic breakdowns.",
     "Results",
@@ -51,23 +47,44 @@ if run is None:
 totals = run["totals"]
 config = run["config"]
 
-st.caption(
-    f"Run `{run['run_id']}` · {config['model']} · cohort {config['cohort_size']} · "
-    f"seed {config['seed']} · calibration "
-    f"{'on' if config['calibration_applied'] else 'off'} · {run['created_at']}"
+st.markdown(
+    f'<p style="color:{theme.TEXT_SECONDARY}; font-size:0.85rem;">'
+    f'<span title="Full run ID: {run["run_id"]}"><b>{theme.run_label(run["run_id"])}</b></span>'
+    f" &nbsp;·&nbsp; {config['model']} &nbsp;·&nbsp; cohort {config['cohort_size']}"
+    f" &nbsp;·&nbsp; seed {config['seed']} &nbsp;·&nbsp; calibration "
+    f"{'on' if config['calibration_applied'] else 'off'}"
+    f" &nbsp;·&nbsp; {theme.format_timestamp(run['created_at'])}</p>",
+    unsafe_allow_html=True,
 )
 
 # ---------------------------------------------------------------------------
 # Headline metrics
 # ---------------------------------------------------------------------------
 
+halluc_pct = totals["hallucination_rate"] * 100
+consistency_pct = totals["consistency_score"] * 100
+
 tiles = st.columns(6)
-tiles[0].metric("Responses", f"{totals['total_responses']:,}")
-tiles[1].metric("Hallucination", f"{totals['hallucination_rate']:.1%}")
-tiles[2].metric("Consistency", f"{totals['consistency_score']:.1%}")
-tiles[3].metric("Tokens", f"{totals['total_tokens']:,}")
-tiles[4].metric("Cost", f"${totals['total_cost_usd']:.2f}")
-tiles[5].metric("Throughput", f"{totals['throughput_per_min']:,}/min")
+tiles[0].markdown(theme.kpi_card(
+    "Responses", f"{totals['total_responses']:,}", "", "info",
+), unsafe_allow_html=True)
+tiles[1].markdown(theme.kpi_card(
+    "Hallucination", f"{halluc_pct:.1f}%", "target < 5%",
+    "good" if halluc_pct < 5 else ("warn" if halluc_pct <= 8 else "bad"),
+), unsafe_allow_html=True)
+tiles[2].markdown(theme.kpi_card(
+    "Consistency", f"{consistency_pct:.1f}%", "target > 90%",
+    "good" if consistency_pct > 90 else ("warn" if consistency_pct >= 80 else "bad"),
+), unsafe_allow_html=True)
+tiles[3].markdown(theme.kpi_card(
+    "Tokens", f"{totals['total_tokens']:,}", "", "info",
+), unsafe_allow_html=True)
+tiles[4].markdown(theme.kpi_card(
+    "Cost", f"${totals['total_cost_usd']:.2f}", "", "neutral",
+), unsafe_allow_html=True)
+tiles[5].markdown(theme.kpi_card(
+    "Throughput", f"{totals['throughput_per_min']:,}/min", "", "info",
+), unsafe_allow_html=True)
 
 st.divider()
 
@@ -83,10 +100,11 @@ for result in run["question_results"]:
     badge = ""
     if config["calibration_applied"] and js_before > 0:
         improvement = (js_before - js_after) / js_before * 100
-        badge = (
-            f'&nbsp;<span class="niq-badge" style="background:{theme.GREEN};">'
-            f"↑ {improvement:.0f}% improvement</span>"
-        )
+        if improvement > 0:
+            badge = (
+                f'&nbsp;<span class="niq-badge" style="background:{theme.GREEN};">'
+                f"BDCL calibration reduced JS divergence by {improvement:.0f}%</span>"
+            )
     st.markdown(f"**{result['text']}**{badge}", unsafe_allow_html=True)
 
     def _pct(counts: list[float]) -> list[float]:
@@ -103,6 +121,7 @@ for result in run["question_results"]:
         st.plotly_chart(
             distribution_chart(result["options"], series),
             use_container_width=True,
+            config=PLOTLY_CONFIG,
             key=f"dist_{result['question_id']}",
         )
     with metric_col:
@@ -110,7 +129,7 @@ for result in run["question_results"]:
         raw_met = result["metrics_raw"]
         st.metric(
             "JS divergence",
-            f"{met['js_divergence']:.4f}",
+            theme.fmt_metric(met["js_divergence"]),
             delta=(
                 f"{met['js_divergence'] - raw_met['js_divergence']:+.4f} vs raw"
                 if config["calibration_applied"] else None
@@ -119,7 +138,7 @@ for result in run["question_results"]:
         )
         st.metric(
             "Wasserstein",
-            f"{met['wasserstein_distance']:.4f}",
+            theme.fmt_metric(met["wasserstein_distance"]),
             delta=(
                 f"{met['wasserstein_distance'] - raw_met['wasserstein_distance']:+.4f} vs raw"
                 if config["calibration_applied"] else None
@@ -129,7 +148,7 @@ for result in run["question_results"]:
         st.metric("Shannon entropy", f"{met['shannon_entropy']:.2f} bits")
 
     with st.expander("Table view"):
-        table = pd.DataFrame({"option": result["options"]})
+        table = pd.DataFrame({"Option": result["options"]})
         for name, values in series.items():
             table[f"{name} %"] = [round(v, 1) for v in values]
         st.dataframe(table, use_container_width=True, hide_index=True)
@@ -150,7 +169,9 @@ with col1:
     breakdown_question = st.selectbox("Question", list(question_map))
 with col2:
     dimension = st.selectbox(
-        "Dimension", ["age_group", "income_group", "region", "behavioral_archetype"]
+        "Dimension",
+        ["age_group", "income_group", "region", "behavioral_archetype"],
+        format_func=lambda d: d.replace("_", " ").capitalize(),
     )
 
 selected = question_map[breakdown_question]
@@ -170,10 +191,10 @@ fig = distribution_chart(selected["options"], breakdown_series)
 # Breakdown groups are entities of this chart — fixed slot order by group.
 for i, trace in enumerate(fig.data):
     trace.marker.color = CATEGORICAL[i % len(CATEGORICAL)]
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
 with st.expander("Table view"):
-    table = pd.DataFrame({"option": selected["options"]})
+    table = pd.DataFrame({"Option": selected["options"]})
     for group, values in breakdown_series.items():
         table[f"{group} %"] = [round(v, 1) for v in values]
     st.dataframe(table, use_container_width=True, hide_index=True)

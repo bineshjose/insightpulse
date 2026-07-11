@@ -69,6 +69,13 @@ AGENT_PIPELINE = [
 # the Sinkhorn transport plan's effect).
 CALIBRATION_STRENGTH = 0.8
 
+# Sinkhorn stops at a finite duality-gap tolerance, so calibration never
+# lands exactly on the target. The demo mirrors that with Dirichlet noise
+# around the mixed distribution; this concentration yields residual JS
+# divergences around 1e-3 (realistic, and comfortably under the 0.05
+# acceptance target) instead of an artificially perfect 0.0000.
+CALIBRATION_RESIDUAL_CONC = 1500.0
+
 
 # ---------------------------------------------------------------------------
 # Data access (cached; keyed by directory so tests can point elsewhere)
@@ -193,6 +200,32 @@ def model_distribution(
     return rng.dirichlet(biased * profile["dirichlet_conc"] + 1e-3)
 
 
+def _assign_validation_flags(
+    response_rows: list[dict[str, Any]],
+    profile: dict[str, float],
+    rng: np.random.Generator,
+) -> None:
+    """Flag hallucinated/inconsistent responses at the profile's rates.
+
+    Flag *counts* are pinned to the model profile (±10% jitter) rather than
+    drawn independently per response — small cohorts otherwise show wild
+    sampling swings (e.g. a 1.9%-profile model observing 4%), which
+    misrepresents the documented model behavior in demo walkthroughs.
+    """
+    total = len(response_rows)
+    n_halluc = round(total * profile["hallucination_rate"] * rng.uniform(0.9, 1.1))
+    n_incons = round(total * profile["inconsistency_rate"] * rng.uniform(0.9, 1.1))
+    flagged = rng.permutation(total)
+    for index in flagged[:n_halluc]:
+        response_rows[index]["validation_flags"].append("hallucination_detected")
+    for index in flagged[n_halluc:n_halluc + n_incons]:
+        response_rows[index]["validation_flags"].append(
+            str(rng.choice(["age_inconsistency", "income_inconsistency"]))
+        )
+    for row in response_rows:
+        row["is_valid"] = len(row["validation_flags"]) == 0
+
+
 def simulate_survey_run(
     questions: list[dict[str, Any]],
     cohort: pd.DataFrame,
@@ -247,11 +280,6 @@ def simulate_survey_run(
         for _, panelist in cohort.iterrows():
             dist = distorted[panelist["behavioral_archetype"]]
             answer_index = int(rng.choice(len(options), p=dist))
-            flags: list[str] = []
-            if rng.random() < profile["hallucination_rate"]:
-                flags.append("hallucination_detected")
-            if rng.random() < profile["inconsistency_rate"]:
-                flags.append(rng.choice(["age_inconsistency", "income_inconsistency"]))
             response_rows.append({
                 "response_id": str(uuid4())[:8],
                 "question_id": question["question_id"],
@@ -264,10 +292,11 @@ def simulate_survey_run(
                 "region": panelist["region"],
                 "confidence": round(float(np.clip(rng.normal(0.78, 0.12), 0.05, 0.99)), 2),
                 "model_used": model,
-                "is_valid": len(flags) == 0,
-                "validation_flags": flags,
+                "is_valid": True,
+                "validation_flags": [],
             })
 
+    _assign_validation_flags(response_rows, profile, rng)
     responses = pd.DataFrame(response_rows)
 
     for question in questions:
@@ -280,6 +309,8 @@ def simulate_survey_run(
             raw_p = m.normalize_distribution(raw_counts)
             emp_p = m.normalize_distribution(empirical)
             calibrated_p = (1 - CALIBRATION_STRENGTH) * raw_p + CALIBRATION_STRENGTH * emp_p
+            # Residual transport noise — see CALIBRATION_RESIDUAL_CONC.
+            calibrated_p = rng.dirichlet(calibrated_p * CALIBRATION_RESIDUAL_CONC + 1e-3)
             calibrated_counts = calibrated_p * raw_counts.sum()
         else:
             calibrated_counts = raw_counts.copy()

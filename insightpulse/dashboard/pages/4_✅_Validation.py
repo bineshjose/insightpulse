@@ -1,10 +1,8 @@
 """Validation — cross-validation against empirical ground truth.
 
-Addresses evaluator feedback:
-- #5 Real-world validation: synthetic distributions vs. held-out empirical
-  survey responses, per question, with the full metric suite.
-- #4 Metric justification: why cosine / JS / Wasserstein / entropy fit this
-  data, stated next to the numbers they justify.
+Synthetic distributions vs. held-out empirical survey responses, per
+question, with the full metric suite and the reasoning for why each metric
+fits survey-response data.
 """
 
 import sys
@@ -17,21 +15,17 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from components import auth, data_loader, simulation, theme
-from components.charts import STATUS, distribution_chart
+from components.charts import PLOTLY_CONFIG, STATUS, distribution_chart
 
 sys.path.insert(0, str(data_loader.REPO_ROOT / "src"))
 from insightpulse.utils import metrics as m
 
-st.set_page_config(page_title="Validation | InsightPulse", page_icon="✅", layout="wide")
-
-user = auth.require_auth("analyze")
-theme.apply()
-auth.render_sidebar(user)
+user = auth.require_page("validation")
 theme.page_header(
-    "✅ Validation",
+    "Validation",
     "Cross-validation of the synthetic panel against empirical ground truth. "
-    "In demo mode the ground truth is the historical response bank; in "
-    "production this slot is filled by Pew ATP and ESS benchmark waves.",
+    "Ground truth: synthetic response bank (demo) · Pew ATP & ESS benchmark "
+    "waves (production).",
     "Validation",
 )
 
@@ -45,17 +39,21 @@ TARGETS = {
     "wasserstein_distance": ("≤", 0.15),
     "normalized_entropy": ("≥", 0.60),
 }
+COSINE_TARGET = 0.80
 
 panelists = data_loader.load_panelists()
 catalog = data_loader.question_catalog()
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 with col1:
     model = st.selectbox("Model to validate", list(simulation.MODEL_PROFILES))
 with col2:
     cohort_size = st.slider("Validation cohort", 100, 500, 300, 50)
-with col3:
-    seed = st.number_input("Seed", value=42, min_value=0)
+with st.expander("⚙ Advanced settings"):
+    seed = st.number_input(
+        "Random seed", value=42, min_value=0,
+        help="Fixes the sampling so the validation can be reproduced exactly.",
+    )
 
 if st.button("▶ Run cross-validation"):
     cohort = panelists.sample(n=cohort_size, random_state=int(seed))
@@ -64,6 +62,7 @@ if st.button("▶ Run cross-validation"):
             catalog, cohort, model, seed=int(seed), calibrate=True
         )
     st.session_state["validation_run"] = run
+    auth.record_activity("Viewed validation", f"Cross-validation ({model}, seed {seed})")
 
 run = st.session_state.get("validation_run")
 if run is None:
@@ -88,14 +87,48 @@ syn_vec = np.concatenate([m.normalize_distribution(r["calibrated_counts"]) for r
 emp_vec = np.concatenate([m.normalize_distribution(r["empirical_counts"]) for r in results])
 overall_cosine = m.cosine_similarity(syn_vec, emp_vec)
 
+
+def _verdict_line(passed: bool, target_note: str) -> str:
+    """Standardized pass/fail delta line for the metric tiles."""
+    return f"✓ Passes ({target_note})" if passed else f"✗ Below threshold ({target_note})"
+
+
+mean_js = agg["js_divergence"].mean()
+mean_wass = agg["wasserstein_distance"].mean()
+mean_norm_entropy = agg["normalized_entropy"].mean()
+
+cosine_ok = overall_cosine >= COSINE_TARGET
+js_ok = mean_js <= TARGETS["js_divergence"][1]
+wass_ok = mean_wass <= TARGETS["wasserstein_distance"][1]
+entropy_ok = mean_norm_entropy >= TARGETS["normalized_entropy"][1]
+
 tiles = st.columns(4)
-tiles[0].metric("Cosine similarity", f"{overall_cosine:.3f}", "target ≥ 0.80", delta_color="off")
-tiles[1].metric("Mean JS divergence", f"{agg['js_divergence'].mean():.4f}",
-                "target ≤ 0.05", delta_color="off")
-tiles[2].metric("Mean Wasserstein", f"{agg['wasserstein_distance'].mean():.4f}",
-                "target ≤ 0.15", delta_color="off")
-tiles[3].metric("Mean entropy", f"{agg['shannon_entropy'].mean():.2f} bits",
-                "diversity check", delta_color="off")
+tiles[0].markdown(theme.kpi_card(
+    "Cosine similarity", f"{overall_cosine:.3f}",
+    _verdict_line(cosine_ok, f"≥ {COSINE_TARGET:.2f}"),
+    "good" if cosine_ok else "bad",
+), unsafe_allow_html=True)
+tiles[1].markdown(theme.kpi_card(
+    "Mean JS divergence", theme.fmt_metric(mean_js),
+    _verdict_line(js_ok, f"≤ {TARGETS['js_divergence'][1]}"),
+    "good" if js_ok else "bad",
+), unsafe_allow_html=True)
+tiles[2].markdown(theme.kpi_card(
+    "Mean Wasserstein", theme.fmt_metric(mean_wass),
+    _verdict_line(wass_ok, f"≤ {TARGETS['wasserstein_distance'][1]}"),
+    "good" if wass_ok else "bad",
+), unsafe_allow_html=True)
+tiles[3].markdown(theme.kpi_card(
+    "Mean normalized entropy", f"{mean_norm_entropy:.2f}",
+    _verdict_line(entropy_ok, f"≥ {TARGETS['normalized_entropy'][1]:.2f}"),
+    "good" if entropy_ok else "bad",
+), unsafe_allow_html=True)
+
+st.caption(
+    "In demo mode the synthetic and empirical distributions share a common "
+    "source, so cosine similarity is near-perfect. Production mode measures "
+    "real behavioral-to-synthetic alignment (thesis result: 0.84)."
+)
 
 st.divider()
 
@@ -121,17 +154,19 @@ for result in results:
         "verdict": "✅ pass" if passed else "❌ fail",
     })
 
-verdicts = pd.DataFrame(verdict_rows)
+verdicts = theme.humanize_columns(pd.DataFrame(verdict_rows))
 st.dataframe(
     verdicts.style.format({
-        "js_divergence": "{:.4f}", "wasserstein": "{:.4f}",
-        "entropy_bits": "{:.2f}", "normalized_entropy": "{:.2f}",
+        "JS Divergence": theme.fmt_metric,
+        "Wasserstein": theme.fmt_metric,
+        "Entropy (bits)": "{:.2f}",
+        "Normalized Entropy": "{:.2f}",
     }).map(
         lambda v: (
             f"color: {STATUS['good']}" if v == "✅ pass"
             else f"color: {STATUS['critical']}" if v == "❌ fail" else ""
         ),
-        subset=["verdict"],
+        subset=["Verdict"],
     ),
     use_container_width=True, hide_index=True,
 )
@@ -149,11 +184,11 @@ st.plotly_chart(distribution_chart(
     {"Calibrated": _pct(result["calibrated_counts"]),
      "Empirical": _pct(result["empirical_counts"])},
     title="Calibrated synthetic vs. empirical ground truth",
-), use_container_width=True)
+), use_container_width=True, config=PLOTLY_CONFIG)
 
 with st.expander("Table view"):
     st.dataframe(pd.DataFrame({
-        "option": result["options"],
+        "Option": result["options"],
         "Calibrated %": [round(v, 1) for v in _pct(result["calibrated_counts"])],
         "Empirical %": [round(v, 1) for v in _pct(result["empirical_counts"])],
     }), use_container_width=True, hide_index=True)
@@ -161,7 +196,7 @@ with st.expander("Table view"):
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Metric justification (evaluator feedback #4)
+# Metric justification
 # ---------------------------------------------------------------------------
 
 st.subheader("Why these metrics?")

@@ -43,17 +43,34 @@ USERS: dict[str, dict[str, Any]] = {
         "permissions": {"view", "create", "run", "analyze", "export", "calibrate"},
         "tier": "Enterprise",
         "credits_total": 3000,
-        "credits_balance": 2500,
-        "api_calls_remaining": 10_000,
+        "credits_balance": 1847,
+        "api_calls_remaining": 3_247,
         "api_calls_quota": 10_000,
         "max_cohort_size": 5000,
         "created": "2025-08-14",
+    },
+    "analyst@nielseniq.com": {
+        "password": "analyst123",
+        "name": "Priya Sharma",
+        "initials": "PS",
+        "role": "Survey Analyst",
+        "title": "Consumer Research Analyst",
+        "department": "Market Research — FMCG Division",
+        "regions": ["APAC"],
+        "permissions": {"view", "create", "run", "analyze"},
+        "tier": "Professional",
+        "credits_total": 3000,
+        "credits_balance": 1850,
+        "api_calls_remaining": 6_753,
+        "api_calls_quota": 10_000,
+        "max_cohort_size": 1000,
+        "created": "2025-10-21",
     },
     "evaluator@iitm.ac.in": {
         "password": "eval2024",
         "name": "External Evaluator",
         "initials": "EV",
-        "role": "Read-Only Analyst",
+        "role": "Read-Only Evaluator",
         "title": "Faculty Reviewer",
         "department": "Academic Review Board",
         "regions": ["APAC"],
@@ -84,6 +101,34 @@ USERS: dict[str, dict[str, Any]] = {
         "created": "2025-09-30",
     },
 }
+
+# Pages each role may open, keyed by the page slug used in app.py's
+# st.navigation registry. Restricted pages are hidden from the sidebar
+# (see render_sidebar) AND gated at render time (see require_page), so a
+# direct URL lands on the Access Restricted card instead of the content.
+PAGE_ACCESS: dict[str, set[str]] = {
+    "Platform Administrator": {
+        "home", "survey-runner", "results", "experiments",
+        "validation", "audit", "profile",
+    },
+    # Analysts (and the demo account) work with surveys and results only.
+    "Survey Analyst": {"home", "survey-runner", "results", "profile"},
+    # Evaluators see everything, but the Survey Runner is read-only for
+    # them (the Run button is disabled — they lack the "run" permission).
+    "Read-Only Evaluator": {
+        "home", "survey-runner", "results", "experiments",
+        "validation", "audit", "profile",
+    },
+}
+
+ALL_PAGE_SLUGS: set[str] = {
+    "home", "survey-runner", "results", "experiments", "validation", "audit", "profile",
+}
+
+
+def allowed_pages(user: dict[str, Any]) -> set[str]:
+    """Page slugs this user's role may open."""
+    return PAGE_ACCESS.get(user["role"], {"home", "profile"})
 
 TIER_FEATURES: dict[str, list[str]] = {
     "Enterprise": [
@@ -132,7 +177,7 @@ def login(email: str, password: str) -> bool:
         return False
     profile = {k: v for k, v in account.items() if k != "password"}
     profile["email"] = email.strip().lower()
-    profile["last_login"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    profile["last_login"] = datetime.now().strftime("%b %d, %Y · %I:%M %p")
     st.session_state["auth_user"] = profile
     # Editable preferences live separately so "Save Changes" never mutates
     # the account fixture.
@@ -161,11 +206,14 @@ def has_permission(user: dict[str, Any], permission: str) -> bool:
     return permission in user.get("permissions", set())
 
 
+_ACTIVITY_TIME_FORMAT = "%b %d, %I:%M %p"
+
+
 def record_activity(action: str, details: str) -> None:
     """Append one entry to the session activity log (shown on Profile)."""
     log = st.session_state.setdefault("activity_log", [])
     log.append({
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "timestamp": datetime.now().strftime(_ACTIVITY_TIME_FORMAT),
         "action": action,
         "details": details,
     })
@@ -175,27 +223,47 @@ def activity_log() -> list[dict[str, str]]:
     """The session's activity entries, newest first (seeded for realism)."""
     seeded = _seed_activity()
     live = list(reversed(st.session_state.get("activity_log", [])))
-    return (live + seeded)[:10]
+    return (live + seeded)[:12]
 
 
 def _seed_activity() -> list[dict[str, str]]:
-    """Deterministic historical entries so the log never looks empty."""
+    """Deterministic historical entries so the log never looks empty.
+
+    Varied actions, topics, and spacing so the log reads like real usage
+    rather than a repeated fixture row.
+    """
     base = datetime.now()
     entries = [
-        ("Ran survey", "Organic Labeling Importance (50 respondents, claude-sonnet-4-6)"),
-        ("Exported results", "Q3 Brand Perception — CSV"),
-        ("Ran experiment", "Multi-LLM Comparison (3 models, seed 42)"),
-        ("Viewed validation", "Cross-validation vs empirical bank"),
-        ("Ran survey", "Sustainability Willingness-to-Pay (120 respondents)"),
-        ("Updated settings", "Default model → claude-sonnet-4-6"),
+        (timedelta(hours=2, minutes=41),
+         "Ran survey", "Organic Labeling Importance (100 respondents, claude-sonnet-4-6)"),
+        (timedelta(hours=3, minutes=15),
+         "Ran experiment", "Multi-LLM Comparison (4 models, seed 42)"),
+        (timedelta(hours=8, minutes=48),
+         "Exported results", "Q3 Brand Perception Tracker — CSV"),
+        (timedelta(hours=11, minutes=29),
+         "Ran survey", "Price Sensitivity Pulse (200 respondents, gpt-4o)"),
+        (timedelta(hours=17, minutes=20),
+         "Viewed validation", "Cross-validation vs empirical response bank"),
+        (timedelta(days=1, hours=4, minutes=52),
+         "Reviewed audit trail", "Run #3E04 — provenance and quality gates"),
+        (timedelta(days=1, hours=9, minutes=7),
+         "Updated calibration settings", "Sinkhorn ε 0.05 → 0.1 for production preset"),
+        (timedelta(days=1, hours=13, minutes=33),
+         "Generated drift report", "Category-mix drift vs 3-month baseline"),
+        (timedelta(days=2, hours=6, minutes=18),
+         "Adjusted cohort filters", "APAC region · Premium Loyalist archetype"),
+        (timedelta(days=2, hours=10, minutes=55),
+         "Ran survey", "Sustainability Willingness-to-Pay (120 respondents, claude-haiku-4-5)"),
+        (timedelta(days=3, hours=2, minutes=44),
+         "Updated settings", "Default model → claude-sonnet-4-6"),
     ]
     return [
         {
-            "timestamp": (base - timedelta(days=i + 1, hours=3 * i)).strftime("%Y-%m-%d %H:%M"),
+            "timestamp": (base - offset).strftime(_ACTIVITY_TIME_FORMAT),
             "action": action,
             "details": details,
         }
-        for i, (action, details) in enumerate(entries)
+        for offset, action, details in entries
     ]
 
 
@@ -227,9 +295,11 @@ div[data-testid="stForm"] {{
     background: #FFFFFF;
     border-radius: 16px;
     padding: 2rem 2.2rem;
-    box-shadow: 0 20px 60px rgba(0, 20, 40, 0.45);
-    border: none;
+    box-shadow: 0 12px 28px rgba(0, 20, 40, 0.35), 0 28px 80px rgba(0, 20, 40, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.65);
 }}
+/* No "Press Enter to submit form" hints on the credential fields. */
+.stTextInput div[data-testid="InputInstructions"] {{ display: none; }}
 .login-tagline {{
     color: rgba(255,255,255,0.85);
     text-align: center;
@@ -297,34 +367,59 @@ div[data-testid="stForm"] {{
 # Gate + shared sidebar
 # ---------------------------------------------------------------------------
 
-def require_auth(permission: str | None = None) -> dict[str, Any]:
-    """Authentication gate for every page.
-
-    Args:
-        permission: Optional permission this page needs beyond sign-in
-            (e.g. "run", "analyze"). None means any signed-in user.
+def require_auth() -> dict[str, Any]:
+    """Sign-in gate for the app entrypoint.
 
     Returns:
-        The authenticated user profile. Stops rendering (login page or
-        access-restricted notice) otherwise.
+        The authenticated user profile; renders the login page and stops
+        otherwise.
     """
     user = current_user()
     if user is None:
         login_page()
         st.stop()
-    if permission is not None and not has_permission(user, permission):
-        theme.apply()
-        render_sidebar(user)
-        st.markdown("## Access Restricted")
-        st.warning(
-            f"Your role (**{user['role']}**) does not include the "
-            f"'{permission}' capability. Contact your administrator to "
-            "request access.",
-            icon="🔒",
-        )
-        theme.footer()
+    return user
+
+
+def require_page(slug: str) -> dict[str, Any]:
+    """Role gate at the top of every page.
+
+    Args:
+        slug: The page's slug in the st.navigation registry
+            (e.g. "experiments").
+
+    Returns:
+        The authenticated user profile. Renders the Access Restricted card
+        and stops when the user's role may not open this page.
+    """
+    user = require_auth()
+    if slug not in allowed_pages(user):
+        _access_restricted(user)
         st.stop()
     return user
+
+
+def _access_restricted(user: dict[str, Any]) -> None:
+    """Render the Access Restricted card (reached only via direct URL)."""
+    st.markdown(
+        f"""
+<div class="niq-card" style="max-width:520px; margin:9vh auto 1.2rem auto;
+            text-align:center; padding:2.6rem 2.4rem;">
+  <div style="font-size:2.6rem; line-height:1;">🔒</div>
+  <h3 style="margin:0.8rem 0 0.4rem 0;">Access Restricted</h3>
+  <p style="color:{theme.TEXT_SECONDARY}; margin:0.2rem 0;">
+    You don't have permission to view this page.</p>
+  <p style="margin:0.5rem 0;">Your role: <b>{user["role"]}</b></p>
+  <p style="color:{theme.TEXT_SECONDARY}; font-size:0.9rem; margin:0.2rem 0;">
+    Contact your administrator for elevated access.</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    _, center, _ = st.columns([1.6, 1, 1.6])
+    with center:
+        if st.button("Go to Dashboard", use_container_width=True):
+            st.switch_page("views/home.py")
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -337,26 +432,46 @@ def _api_healthy(api_url: str) -> bool:
         return False
 
 
+def hide_restricted_nav(user: dict[str, Any]) -> None:
+    """Hide navigation entries for pages the user's role may not open.
+
+    Pages stay registered in st.navigation (so a direct URL renders the
+    Access Restricted card instead of a 404); this only removes them from
+    the sidebar list.
+    """
+    hidden = ALL_PAGE_SLUGS - allowed_pages(user)
+    if not hidden:
+        return
+    rules = "\n".join(
+        f'[data-testid="stSidebarNav"] li:has(a[href$="/{slug}"]) {{ display: none; }}'
+        for slug in sorted(hidden)
+    )
+    st.markdown(f"<style>{rules}</style>", unsafe_allow_html=True)
+
+
 def render_sidebar(user: dict[str, Any]) -> None:
     """Render the shared sidebar chrome (logo, user, status, logout)."""
     import os
 
-    with st.sidebar:
-        logo = _asset_data_uri("logo.svg")
-        if logo:
-            st.markdown(
-                f'<img src="{logo}" alt="InsightPulse" style="width:200px;'
-                f' background:#FFFFFF; padding:8px 10px; border-radius:10px;"/>',
-                unsafe_allow_html=True,
-            )
-        st.divider()
+    # Brand logo at the very top of the sidebar, above the navigation
+    # (sizing and the divider underneath come from theme.apply CSS).
+    logo_path = _ASSETS_DIR / "logo.svg"
+    if logo_path.exists():
+        st.logo(str(logo_path), size="large")
+    hide_restricted_nav(user)
 
-        avatar_color = theme.TIER_COLORS.get(user["tier"], theme.BLUE)
-        credits_pct = int(100 * user["credits_balance"] / user["credits_total"])
+    with st.sidebar:
+        credits_used = user["credits_total"] - user["credits_balance"]
+        used_fraction = credits_used / user["credits_total"]
+        bar_color = theme.usage_color(used_fraction)
+        # Navy reads as "no color" on the navy sidebar — use blue there.
+        if bar_color == theme.NAVY:
+            bar_color = theme.BLUE
         st.markdown(
             f"""
 <div style="display:flex; align-items:center; gap:0.7rem;">
-  <div style="width:44px; height:44px; border-radius:50%; background:{avatar_color};
+  <div style="width:44px; height:44px; border-radius:50%;
+              background:linear-gradient(135deg, {theme.NAVY} 0%, {theme.BLUE} 100%);
               border:2px solid rgba(255,255,255,0.7); display:flex; align-items:center;
               justify-content:center; font-weight:700; font-size:1rem;">{user["initials"]}</div>
   <div style="line-height:1.25;">
@@ -369,7 +484,8 @@ def render_sidebar(user: dict[str, Any]) -> None:
   Credits: {user["credits_balance"]:,} / {user["credits_total"]:,}
 </div>
 <div style="background:rgba(255,255,255,0.25); border-radius:99px; height:6px; margin-top:4px;">
-  <div style="background:{theme.BLUE}; width:{credits_pct}%; height:6px; border-radius:99px;"></div>
+  <div style="background:{bar_color}; width:{used_fraction:.0%}; height:6px;
+              border-radius:99px;"></div>
 </div>
 """,
             unsafe_allow_html=True,
