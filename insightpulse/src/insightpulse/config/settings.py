@@ -36,7 +36,7 @@ class Environment(StrEnum):
 class DataSource(StrEnum):
     """Where panelist data is loaded from."""
 
-    SYNTHETIC = "synthetic"   # Generated sample data (demo)
+    DEMO = "demo"            # Generated panel data (demo)
     CSV = "csv"               # Mounted CSV files
     API = "api"               # NIQ data API (production)
 
@@ -227,6 +227,72 @@ class InsightConfig(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
+# Data Engineering Configuration (L1 production connectors + ETL)
+# ---------------------------------------------------------------------------
+
+class SnowflakeConfig(BaseSettings):
+    """Snowflake connection settings (PB-scale NIQ panel data, queried in place).
+
+    Demo default: disabled (``account`` is None) — the connector factory
+    resolves to the CSV connector instead.
+    """
+
+    account: str | None = None
+    user: str | None = None
+    password: SecretStr | None = None
+    warehouse: str = "INSIGHTPULSE_WH"
+    database: str = "NIQ_PANEL"
+    db_schema: str = "CPS"
+    role: str = "INSIGHTPULSE_READER"
+    query_timeout_seconds: int = Field(default=300, ge=1)
+    # Hard cap on extracted working-set size (rows) — PB data never leaves
+    # Snowflake wholesale; every query is WHERE + LIMIT bounded.
+    max_extract_rows: int = Field(default=10_000, ge=1)
+
+    def is_configured(self) -> bool:
+        """True when enough settings exist to open a connection."""
+        return self.account is not None and self.user is not None
+
+
+class ADLSConfig(BaseSettings):
+    """Azure Data Lake Storage settings (benchmark landing + ML artifacts)."""
+
+    account_name: str | None = None
+    container_name: str = "insightpulse"
+    # 'default' = DefaultAzureCredential (managed identity / az login);
+    # 'connection_string' reads ADLS_CONNECTION_STRING from the env.
+    credential_type: str = "default"
+
+    def is_configured(self) -> bool:
+        """True when an ADLS account is set."""
+        return self.account_name is not None
+
+
+class RedisCacheConfig(BaseSettings):
+    """Redis hot-cache settings (current working set only)."""
+
+    url: str = "redis://localhost:6379/0"
+    ttl_seconds: int = Field(default=3600, ge=1)
+    max_memory_mb: int = Field(default=512, ge=16)
+    key_prefix: str = "insightpulse"
+
+
+class ETLConfig(BaseSettings):
+    """ETL pipeline tuning: batching, retries, and quality thresholds."""
+
+    batch_size: int = Field(default=1_000, ge=1)
+    retry_count: int = Field(default=3, ge=0, le=10)
+    retry_wait_seconds: float = Field(default=2.0, ge=0.0)
+    # Quality gate: fraction of checks that must pass for a load to proceed.
+    quality_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
+    # Minimum cohort size the extraction pipeline will accept.
+    min_cohort_size: int = Field(default=10, ge=1)
+    # Benchmark distributions: no single option may exceed this share.
+    max_option_share: float = Field(default=0.80, gt=0.0, le=1.0)
+    min_sample_size: int = Field(default=30, ge=1)
+
+
+# ---------------------------------------------------------------------------
 # Main Settings
 # ---------------------------------------------------------------------------
 
@@ -256,9 +322,9 @@ class Settings(BaseSettings):
     ollama_base_url: str | None = None
 
     # --- Data ---
-    data_source: DataSource = DataSource.SYNTHETIC
+    data_source: DataSource = DataSource.DEMO
     data_dir: Path = Path("data")
-    synthetic_data_dir: Path = Path("data/synthetic")
+    demo_data_dir: Path = Path("data/demo")
 
     # --- Database ---
     database_url: str = "sqlite+aiosqlite:///app/storage/insightpulse.db"
@@ -295,6 +361,10 @@ class Settings(BaseSettings):
     data_layer: DataLayerConfig = DataLayerConfig()
     generation: GenerationConfig = GenerationConfig()
     insight: InsightConfig = InsightConfig()
+    snowflake: SnowflakeConfig = SnowflakeConfig()
+    adls: ADLSConfig = ADLSConfig()
+    redis_cache: RedisCacheConfig = RedisCacheConfig()
+    etl: ETLConfig = ETLConfig()
 
     @field_validator("log_level")
     @classmethod

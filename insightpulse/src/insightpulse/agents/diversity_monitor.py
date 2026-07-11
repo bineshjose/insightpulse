@@ -1,7 +1,7 @@
 """DiversityMonitor agent — thin orchestration wrapper over L5.
 
 Delegates response analytics to the environment's
-:class:`~insightpulse.layers.insight_layer.InsightEngine` and applies the
+:class:`~insightpulse.analytics.insights.InsightEngine` and applies the
 diversity policy on top: questions whose Shannon entropy falls below the
 configured floor are flagged for temperature-adjusted regeneration
 (guarding against "behavioral flattening" — LLM mode collapse).
@@ -24,8 +24,8 @@ from typing import Any
 
 import numpy as np
 
+from insightpulse.analytics import get_insight_engine
 from insightpulse.config.settings import get_settings
-from insightpulse.layers import get_insight_engine
 from insightpulse.utils import metrics as m
 from insightpulse.utils.logging import get_logger
 

@@ -1,7 +1,7 @@
 """TwinOrchestrator agent — thin orchestration wrapper over L3.
 
 Delegates all response generation to the environment's
-:class:`~insightpulse.layers.generative_layer.GenerationEngine`
+:class:`~insightpulse.ml.generation.GenerationEngine`
 (DemoGenerationEngine in demo — statistically faithful, key-free;
 LLMGenerationEngine in production — concurrent, retried, circuit-broken).
 Persona prompting, response parsing, sequential-question conditioning
@@ -28,8 +28,9 @@ from typing import Any
 import pandas as pd
 
 from insightpulse.config.settings import get_settings
-from insightpulse.exceptions import DataLayerError, GenerationError
-from insightpulse.layers import get_data_repository, get_generation_engine
+from insightpulse.core.exceptions import DataLayerError, GenerationError
+from insightpulse.data.repositories import get_data_repository
+from insightpulse.ml.generation import get_generation_engine
 from insightpulse.utils.logging import get_logger
 
 logger = get_logger(__name__)

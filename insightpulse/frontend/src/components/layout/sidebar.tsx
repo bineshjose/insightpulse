@@ -9,6 +9,7 @@ import {
   ClipboardList,
   FlaskConical,
   LayoutDashboard,
+  ScanSearch,
   ShieldCheck,
   Target,
   User as UserIcon,
@@ -19,17 +20,46 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import type { SubscriptionTier } from "@/lib/types";
+import type { SubscriptionTier, UserRole } from "@/lib/types";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/survey", label: "Survey Runner", icon: Target },
-  { href: "/results", label: "Results", icon: BarChart3 },
-  { href: "/experiments", label: "Experiments", icon: FlaskConical },
-  { href: "/validation", label: "Validation", icon: ShieldCheck },
-  { href: "/audit", label: "Audit", icon: ClipboardList },
-  { href: "/profile", label: "Profile", icon: UserIcon },
-] as const;
+/** Nav entries with the roles allowed to see them (mirrors the Streamlit
+ * PAGE_ACCESS map; null = every signed-in role, including the demo
+ * account's Survey Analyst role). */
+const NAV_ITEMS: readonly {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles: readonly UserRole[] | null;
+}[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
+  {
+    href: "/data-explorer",
+    label: "Data Explorer",
+    icon: ScanSearch,
+    roles: ["Platform Administrator", "Read-Only Evaluator"],
+  },
+  { href: "/survey", label: "Survey Runner", icon: Target, roles: null },
+  { href: "/results", label: "Results", icon: BarChart3, roles: null },
+  {
+    href: "/experiments",
+    label: "Experiments",
+    icon: FlaskConical,
+    roles: ["Platform Administrator", "Read-Only Evaluator"],
+  },
+  {
+    href: "/validation",
+    label: "Validation",
+    icon: ShieldCheck,
+    roles: ["Platform Administrator", "Read-Only Evaluator"],
+  },
+  {
+    href: "/audit",
+    label: "Audit",
+    icon: ClipboardList,
+    roles: ["Platform Administrator", "Read-Only Evaluator"],
+  },
+  { href: "/profile", label: "Profile", icon: UserIcon, roles: null },
+];
 
 const TIER_VARIANT: Record<SubscriptionTier, "navy" | "blue" | "green"> = {
   Enterprise: "navy",
@@ -55,7 +85,9 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-2.5" aria-label="Primary">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.filter(
+          (item) => item.roles === null || (user && item.roles.includes(user.role)),
+        ).map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <Link

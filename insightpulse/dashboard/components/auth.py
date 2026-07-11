@@ -108,7 +108,7 @@ USERS: dict[str, dict[str, Any]] = {
 # direct URL lands on the Access Restricted card instead of the content.
 PAGE_ACCESS: dict[str, set[str]] = {
     "Platform Administrator": {
-        "home", "survey-runner", "results", "experiments",
+        "home", "data-explorer", "survey-runner", "results", "experiments",
         "validation", "audit", "profile",
     },
     # Analysts (and the demo account) work with surveys and results only.
@@ -116,13 +116,14 @@ PAGE_ACCESS: dict[str, set[str]] = {
     # Evaluators see everything, but the Survey Runner is read-only for
     # them (the Run button is disabled — they lack the "run" permission).
     "Read-Only Evaluator": {
-        "home", "survey-runner", "results", "experiments",
+        "home", "data-explorer", "survey-runner", "results", "experiments",
         "validation", "audit", "profile",
     },
 }
 
 ALL_PAGE_SLUGS: set[str] = {
-    "home", "survey-runner", "results", "experiments", "validation", "audit", "profile",
+    "home", "data-explorer", "survey-runner", "results", "experiments",
+    "validation", "audit", "profile",
 }
 
 

@@ -20,8 +20,8 @@ from typing import Any
 
 import structlog
 
-from insightpulse.llm.router import LLMRouter
-from insightpulse.models.survey import QuestionType
+from insightpulse.core.models.survey import QuestionType
+from insightpulse.ml.llm.router import LLMRouter
 
 logger = structlog.get_logger(__name__)
 

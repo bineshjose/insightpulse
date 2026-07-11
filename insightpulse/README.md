@@ -134,20 +134,23 @@ Run all: `make experiments`
 ```
 insightpulse/
 ├── src/insightpulse/
-│   ├── agents/            # 8 LangGraph agents + orchestrator DAG
-│   ├── llm/               # LiteLLM multi-model router (cost + latency tracking)
-│   ├── models/            # Pydantic v2 data models (panelists, surveys, embeddings)
+│   ├── core/              # Domain models (Pydantic v2), exceptions, constants
 │   ├── config/            # Settings with demo/production/test profiles
+│   ├── data/              # L1: connectors, ETL pipelines, repositories
+│   ├── ml/                # L2-L4: embeddings, generation, calibration, LLM router
+│   ├── agents/            # L5: 8 LangGraph agents + orchestrator DAG
+│   ├── analytics/         # Insight engines, EDA, distribution analysis
+│   ├── api/               # FastAPI app, routes, middleware
 │   ├── utils/             # Evaluation metrics + structlog configuration
 │   └── demo_engine.py     # Offline twin demo engine (shared by dashboard + experiments)
 ├── dashboard/             # Streamlit app (5 pages + shared components)
 ├── experiments/           # 4 reproducible experiments + shared figure style
-├── data/synthetic/        # Sample data generator (+ generated CSVs, git-ignored)
+├── data/demo/             # Panel data generator (+ generated CSVs, git-ignored)
 ├── tests/                 # pytest: layers, agents, integration, factories, API
 ├── config/profiles/       # Environment profile YAMLs
-├── terraform/             # Azure infrastructure (AKS, ACR, PostgreSQL, Redis, Key Vault)
-├── k8s/                   # Production Kubernetes manifests (HPA, ingress, KV CSI)
-├── ci/workflows/          # GitHub Actions: CI, CD (semver → AKS), security scans
+├── infra/terraform/       # Azure infrastructure (AKS, ACR, PostgreSQL, Redis, Key Vault)
+├── infra/k8s/             # Production Kubernetes manifests (HPA, ingress, KV CSI)
+├── infra/ci/workflows/    # GitHub Actions: CI, CD (semver → AKS), security scans
 └── docs/                  # Architecture, ADRs, API reference, deployment guide
 ```
 

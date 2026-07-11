@@ -1,9 +1,9 @@
 """CohortSelector agent — thin orchestration wrapper over L1 + L2.
 
 Delegates data access to the environment's
-:class:`~insightpulse.layers.data_layer.DataRepository` and behavioral
+:class:`~insightpulse.data.repositories.DataRepository` and behavioral
 enrichment (embeddings, archetype clusters) to the environment's
-:class:`~insightpulse.layers.embedding_layer.EmbeddingEngine`, both
+:class:`~insightpulse.ml.embeddings.EmbeddingEngine`, both
 obtained from the layer factories.
 
 The agent's own responsibilities are strictly orchestration:
@@ -31,8 +31,9 @@ from typing import Any
 import numpy as np
 
 from insightpulse.config.settings import get_settings
-from insightpulse.exceptions import DataLayerError, EmbeddingError
-from insightpulse.layers import get_data_repository, get_embedding_engine
+from insightpulse.core.exceptions import DataLayerError, EmbeddingError
+from insightpulse.data.repositories import get_data_repository
+from insightpulse.ml.embeddings import get_embedding_engine
 from insightpulse.utils.logging import get_logger
 
 logger = get_logger(__name__)

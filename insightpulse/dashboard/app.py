@@ -38,29 +38,33 @@ auth.render_sidebar(user)
 # All pages are registered (so restricted URLs resolve to the Access
 # Restricted card, not a 404); the sidebar hides what the role can't open.
 pages = [
-    st.Page("views/home.py", title="Home", icon=":material/home:", default=True),
+    st.Page("views/home.py", title="Dashboard", icon=":material/home:", default=True),
     st.Page(
-        "pages/1_Survey_Runner.py", title="Survey Runner",
+        "pages/2_Data_Explorer.py", title="Data Explorer",
+        icon=":material/query_stats:", url_path="data-explorer",
+    ),
+    st.Page(
+        "pages/3_Survey_Runner.py", title="Survey Runner",
         icon=":material/checklist:", url_path="survey-runner",
     ),
     st.Page(
-        "pages/2_Results.py", title="Results",
+        "pages/4_Results.py", title="Results",
         icon=":material/monitoring:", url_path="results",
     ),
     st.Page(
-        "pages/3_Experiments.py", title="Experiments",
+        "pages/5_Experiments.py", title="Experiments",
         icon=":material/science:", url_path="experiments",
     ),
     st.Page(
-        "pages/4_Validation.py", title="Validation",
+        "pages/6_Validation.py", title="Validation",
         icon=":material/verified:", url_path="validation",
     ),
     st.Page(
-        "pages/5_Audit.py", title="Audit",
+        "pages/7_Audit.py", title="Audit",
         icon=":material/receipt_long:", url_path="audit",
     ),
     st.Page(
-        "pages/6_Profile.py", title="Profile",
+        "pages/8_Profile.py", title="Profile",
         icon=":material/account_circle:", url_path="profile",
     ),
 ]

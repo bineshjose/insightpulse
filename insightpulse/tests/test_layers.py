@@ -14,13 +14,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from insightpulse.analytics.insights import (
+    BasicInsightEngine,
+    DemographicBreakdownEngine,
+    DriftDetector,
+    FullInsightEngine,
+    ResultAggregator,
+)
 from insightpulse.config.settings import (
     DataLayerConfig,
     EmbeddingConfig,
     GenerationConfig,
     InsightConfig,
 )
-from insightpulse.exceptions import (
+from insightpulse.core.exceptions import (
     CalibrationError,
     CircuitBreakerOpenError,
     DataLayerError,
@@ -28,13 +35,13 @@ from insightpulse.exceptions import (
     GenerationError,
     InsightError,
 )
-from insightpulse.layers.calibration_layer import (
+from insightpulse.data.repositories import CSVRepository, SQLRepository
+from insightpulse.ml.calibration import (
     EmpiricalDistributionLoader,
     FairnessConstraintManager,
     SimpleCalibrationEngine,
 )
-from insightpulse.layers.data_layer import CSVRepository, SQLRepository
-from insightpulse.layers.embedding_layer import (
+from insightpulse.ml.embeddings import (
     ClusteringEngine,
     DemographicEncoder,
     FAISSIndexManager,
@@ -42,19 +49,12 @@ from insightpulse.layers.embedding_layer import (
     PurchaseTokenizer,
     TransformerEmbeddingEngine,
 )
-from insightpulse.layers.generative_layer import (
+from insightpulse.ml.generation import (
     CircuitBreaker,
     DemoGenerationEngine,
     LLMGenerationEngine,
     PersonaPromptBuilder,
     ResponseParser,
-)
-from insightpulse.layers.insight_layer import (
-    BasicInsightEngine,
-    DemographicBreakdownEngine,
-    DriftDetector,
-    FullInsightEngine,
-    ResultAggregator,
 )
 
 LIKERT = ["Not at all important", "Slightly important", "Moderately important",

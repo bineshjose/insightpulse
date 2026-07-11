@@ -23,14 +23,14 @@ htmlcov/
 .coverage
 
 # Data (keep schemas and generators, ignore actual data files)
-data/synthetic/*.csv
-data/synthetic/*.parquet
+data/demo/*.csv
+data/demo/*.parquet
 data/niq/
 data/benchmarks/*.csv
 *.db
 
 # Embedding caches & indexes
-data/synthetic/*.npz
+data/demo/*.npz
 *.index
 *.index.ids.npy
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from insightpulse.api.rate_limit import SlidingWindowRateLimiter
-from insightpulse.main import app
+from insightpulse.api.app import app
+from insightpulse.api.middleware.rate_limit import SlidingWindowRateLimiter
 
 
 @pytest.fixture
@@ -151,7 +151,7 @@ class TestRateLimiter:
 
 class TestErrorMapping:
     def test_domain_error_maps_to_503(self, client, monkeypatch):
-        from insightpulse.exceptions import DataLayerError
+        from insightpulse.core.exceptions import DataLayerError
 
         async def broken_pipeline(**_):
             raise DataLayerError("database unreachable")

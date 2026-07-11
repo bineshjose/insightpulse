@@ -189,7 +189,7 @@ class FakeGenerationEngine:
     async def generate_responses(
         self, questions, panelists, model, seed=42, conditioning_vectors=None
     ) -> list[dict[str, Any]]:
-        from insightpulse.exceptions import GenerationError
+        from insightpulse.core.exceptions import GenerationError
 
         if self._fail:
             raise GenerationError("provider down")

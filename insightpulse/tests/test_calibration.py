@@ -14,14 +14,14 @@ import numpy as np
 import pytest
 
 from insightpulse.agents.calibration_agent import _compute_distribution
-from insightpulse.exceptions import CalibrationError
-from insightpulse.layers.calibration_layer import (
+from insightpulse.core.exceptions import CalibrationError
+from insightpulse.core.models.calibration import CalibrationInput
+from insightpulse.ml.calibration import (
     BehavioralRegularizer,
     SinkhornCalibrationEngine,
     SinkhornSolver,
     ordinal_cost_matrix,
 )
-from insightpulse.models.calibration import CalibrationInput
 
 
 def _solve(source: np.ndarray, target: np.ndarray) -> tuple[np.ndarray, dict]:

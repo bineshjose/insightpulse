@@ -83,7 +83,7 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
         # the title (top-left) and the bars.
         legend={
             "orientation": "h",
-            "yanchor": "bottom", "y": 1.02,
+            "yanchor": "bottom", "y": 1.05,
             "xanchor": "right", "x": 1.0,
             "font": {"color": SECONDARY_INK},
         },

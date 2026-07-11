@@ -35,7 +35,7 @@ from experiments.common import (
     setup_experiment,
 )
 from insightpulse import demo_engine
-from insightpulse.layers.calibration_layer import SinkhornSolver, ordinal_cost_matrix
+from insightpulse.ml.calibration import SinkhornSolver, ordinal_cost_matrix
 from insightpulse.utils import metrics as m
 
 EPSILONS = [0.01, 0.05, 0.1, 0.5]

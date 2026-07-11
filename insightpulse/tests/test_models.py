@@ -2,9 +2,9 @@
 
 from datetime import date
 
-from insightpulse.models.calibration import CalibrationMetrics
-from insightpulse.models.embedding import ClusterAssignment, ConditioningVector
-from insightpulse.models.panelist import (
+from insightpulse.core.models.calibration import CalibrationMetrics
+from insightpulse.core.models.embedding import ClusterAssignment, ConditioningVector
+from insightpulse.core.models.panelist import (
     AgeGroup,
     DemographicProfile,
     HouseholdSize,
@@ -12,7 +12,7 @@ from insightpulse.models.panelist import (
     PurchaseRecord,
     Region,
 )
-from insightpulse.models.survey import QuestionType, SurveyQuestion
+from insightpulse.core.models.survey import QuestionType, SurveyQuestion
 
 
 class TestDemographicProfile:

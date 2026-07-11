@@ -18,13 +18,11 @@ import pytest
 
 from insightpulse.agents import survey_designer
 from insightpulse.agents.orchestrator import run_survey
-from insightpulse.layers import (
-    get_calibration_engine,
-    get_data_repository,
-    get_embedding_engine,
-    get_generation_engine,
-    get_insight_engine,
-)
+from insightpulse.analytics import get_insight_engine
+from insightpulse.data.repositories import get_data_repository
+from insightpulse.ml.calibration import get_calibration_engine
+from insightpulse.ml.embeddings import get_embedding_engine
+from insightpulse.ml.generation import get_generation_engine
 from insightpulse.utils import metrics as m
 
 LIKERT = ["Not at all important", "Slightly important", "Moderately important",

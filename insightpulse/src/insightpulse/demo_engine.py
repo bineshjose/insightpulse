@@ -30,7 +30,7 @@ import pandas as pd
 
 from insightpulse.utils import metrics as m
 
-DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "synthetic"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "demo"
 
 # How closely each model tracks the true conditional distribution.
 # mode_bias: probability mass pulled toward the modal answer (LLM

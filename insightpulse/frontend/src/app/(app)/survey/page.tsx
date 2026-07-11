@@ -54,6 +54,7 @@ export default function SurveyPage() {
     ageGroup: "",
     incomeGroup: "",
     region: "",
+    archetype: "",
   });
   const [model, setModel] = useState<string>(SUPPORTED_MODELS[0]);
   const [seed, setSeed] = useState(42);
@@ -100,6 +101,7 @@ export default function SurveyPage() {
     if (cohort.ageGroup) filters.age_group = cohort.ageGroup;
     if (cohort.incomeGroup) filters.income_group = cohort.incomeGroup;
     if (cohort.region) filters.region = cohort.region;
+    if (cohort.archetype) filters.behavioral_archetype = cohort.archetype;
     try {
       const run = await runSurvey({
         questions: validQuestions,
@@ -307,7 +309,10 @@ export default function SurveyPage() {
               <ReviewRow
                 label="Filters"
                 value={
-                  [cohort.ageGroup, cohort.incomeGroup, cohort.region].filter(Boolean).join(", ") ||
+                  [cohort.ageGroup, cohort.incomeGroup, cohort.region, cohort.archetype]
+                    .filter(Boolean)
+                    .map((v) => v.replace(/_/g, " "))
+                    .join(", ") ||
                   "none"
                 }
               />

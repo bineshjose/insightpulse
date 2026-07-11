@@ -1,0 +1,131 @@
+# InsightPulse data dictionary — every store, table, key, and lake path,
+# with lineage. See docs/data_architecture.md for the flow narrative.
+
+snowflake:
+  description: >
+    NIQ panel warehouse (PB scale). Queried in place — only bounded
+    working sets (WHERE + LIMIT, 1K-10K rows) ever leave.
+  database: NIQ_PANEL
+  schema: CPS
+  tables:
+    CIP_CPS_DEMOGRAPHICS:
+      grain: one row per panelist household
+      columns:
+        panelist_id: {type: varchar, key: primary, description: Household identifier}
+        age_group: {type: varchar, description: "Ordinal: 18-24 … 65+"}
+        income_group: {type: varchar, description: "Ordinal: low … high"}
+        region: {type: varchar, description: Census region}
+        household_size: {type: varchar, description: "1, 2, 3-4, 5+"}
+        education_level: {type: varchar}
+        employment_status: {type: varchar}
+        has_children: {type: boolean}
+      lineage: NIQ Consumer Panel Services intake → CIP conformance layer
+    BDL_CPS_PURCHASES:
+      grain: one row per transaction line
+      columns:
+        panelist_id: {type: varchar, key: foreign, references: CIP_CPS_DEMOGRAPHICS}
+        transaction_date: {type: date}
+        product_category: {type: varchar}
+        brand: {type: varchar}
+        quantity: {type: integer}
+        unit_price: {type: number}
+        total_value: {type: number}
+        store_type: {type: varchar}
+        is_promotion: {type: boolean}
+      lineage: Retail measurement feeds → BDL basket-level conformance
+    RMS_PRODUCT_REF:
+      grain: one row per product
+      columns:
+        product_id: {type: varchar, key: primary}
+        category_id: {type: varchar}
+        brand: {type: varchar}
+        description: {type: varchar}
+      lineage: RMS reference master
+    SURVEY_RESPONSES:
+      grain: one row per (panelist, question) response
+      columns:
+        response_id: {type: varchar, key: primary}
+        survey_id: {type: varchar}
+        question_id: {type: varchar}
+        panelist_id: {type: varchar, key: foreign, references: CIP_CPS_DEMOGRAPHICS}
+        answer: {type: varchar}
+        answer_index: {type: integer}
+      lineage: Historical panel survey waves
+
+postgresql:
+  description: >
+    Application metadata ONLY (MB scale, Alembic-managed). Raw NIQ panel
+    data never lands here.
+  tables:
+    survey_runs:
+      grain: one row per survey run
+      columns:
+        run_id: {type: varchar, key: primary}
+        survey_id: {type: varchar, description: "Display ID, SRV-2026-XXXXX"}
+        metadata: {type: jsonb, description: Client/contract/executor payload}
+        provenance_hash: {type: varchar, description: SHA-256 of run config}
+        created_at: {type: timestamptz}
+      lineage: Written by the AuditAgent at run completion
+    audit_logs:
+      grain: one row per agent execution
+      columns:
+        run_id: {type: varchar, key: foreign, references: survey_runs}
+        agent_name: {type: varchar}
+        action: {type: varchar}
+        duration_ms: {type: number}
+        output_summary: {type: varchar}
+      lineage: Written by the AuditAgent per agent step
+    experiment_results:
+      grain: one row per experiment execution
+      columns:
+        experiment: {type: varchar}
+        executed_at: {type: timestamptz}
+        payload: {type: jsonb, description: Full JSON result}
+      lineage: experiments/* runners
+    benchmark_distributions:
+      grain: one row per (source, version, question, group, option)
+      columns:
+        distribution_key: {type: varchar, key: primary, description: Composite key JSON}
+        source: {type: varchar, description: pew | ess | twin2k | kaggle}
+        version: {type: varchar, description: wave/round/release}
+        question_id: {type: varchar}
+        demographic_group: {type: varchar}
+        option: {type: varchar}
+        share: {type: number}
+        sample_size: {type: integer}
+      lineage: ADLS /benchmarks/raw/* → BenchmarkETLPipeline (weekly)
+
+redis:
+  description: >
+    Hot cache for the CURRENT working set only. TTL 1 hour; completed
+    runs auto-evict. Never a data store.
+  key_pattern: "insightpulse:{run_id}:{type}"
+  entries:
+    cohort: Extracted cohort frame (parquet bytes) — CohortExtractionPipeline
+    embeddings: Cohort behavioral embeddings (npz bytes) — L2 encoder
+    faiss_index: Cohort similarity index — L2 FAISSIndexManager
+    calibration_weights: Fitted BDCL weights — L4 calibration
+
+adls:
+  description: Benchmark landing zone and versioned ML artifacts.
+  container: insightpulse
+  paths:
+    /benchmarks/raw/pew/wave_{id}/: Pew ATP wave parquet + ingestion manifest
+    /benchmarks/raw/ess/round_{id}/: ESS round parquet + ingestion manifest
+    /benchmarks/raw/twin2k/: Twin-2K-500 parquet + ingestion manifest
+    /benchmarks/raw/kaggle/{dataset}/: Kaggle dataset parquet + manifest
+    /artifacts/embeddings/{version}/: Versioned behavioral embeddings (npz)
+    /artifacts/faiss/{version}/: Versioned FAISS indices
+  lineage: >
+    External sources → ingestion pipelines (weekly) → /benchmarks/raw →
+    BenchmarkETLPipeline → PostgreSQL benchmark_distributions.
+
+demo:
+  description: >
+    data/demo CSVs generated by data/demo/generate_sample_data.py mirror
+    the Snowflake tables at demo scale (500 households, 10K purchases,
+    2.5K responses) behind the same connector contract.
+  files:
+    panelists.csv: mirrors CIP_CPS_DEMOGRAPHICS
+    purchases.csv: mirrors BDL_CPS_PURCHASES
+    survey_responses.csv: mirrors SURVEY_RESPONSES

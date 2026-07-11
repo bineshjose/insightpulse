@@ -10,6 +10,7 @@ export interface CohortSettings {
   ageGroup: string;
   incomeGroup: string;
   region: string;
+  archetype: string;
 }
 
 interface CohortConfigProps {
@@ -18,12 +19,27 @@ interface CohortConfigProps {
   maxSize: number;
 }
 
+/** "upper_middle" → "Upper Middle" for filter labels. */
+function humanize(value: string): string {
+  return value
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 const ANY = { value: "", label: "Any" };
 const AGE_GROUPS = [ANY, ...["18-24", "25-34", "35-44", "45-54", "55-64", "65+"].map((v) => ({ value: v, label: v }))];
-const INCOME_GROUPS = [ANY, ...["low", "lower_middle", "middle", "upper_middle", "high"].map((v) => ({ value: v, label: v.replace("_", " ") }))];
-const REGIONS = [ANY, ...["northeast", "midwest", "south", "west"].map((v) => ({ value: v, label: v }))];
+const INCOME_GROUPS = [ANY, ...["low", "lower_middle", "middle", "upper_middle", "high"].map((v) => ({ value: v, label: humanize(v) }))];
+const REGIONS = [ANY, ...["northeast", "midwest", "south", "west"].map((v) => ({ value: v, label: humanize(v) }))];
+const ARCHETYPES = [ANY, ...[
+  "price_sensitive",
+  "premium_loyalist",
+  "category_explorer",
+  "promotion_driven",
+  "convenience_oriented",
+].map((v) => ({ value: v, label: humanize(v) }))];
 
-/** Cohort size + demographic filter panel (tier-capped size). */
+/** Cohort size + demographic/archetype filter panel (tier-capped size). */
 export function CohortConfig({ value, onChange, maxSize }: CohortConfigProps) {
   return (
     <div className="space-y-4">
@@ -43,7 +59,7 @@ export function CohortConfig({ value, onChange, maxSize }: CohortConfigProps) {
           Your tier allows up to {formatNumber(maxSize)} respondents per run.
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor="filter-age">Age group</Label>
           <Select
@@ -69,6 +85,15 @@ export function CohortConfig({ value, onChange, maxSize }: CohortConfigProps) {
             options={REGIONS}
             value={value.region}
             onChange={(event) => onChange({ ...value, region: event.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="filter-archetype">Behavioral archetype</Label>
+          <Select
+            id="filter-archetype"
+            options={ARCHETYPES}
+            value={value.archetype}
+            onChange={(event) => onChange({ ...value, archetype: event.target.value })}
           />
         </div>
       </div>

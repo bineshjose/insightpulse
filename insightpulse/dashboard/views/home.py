@@ -124,10 +124,10 @@ st.markdown("")
 st.markdown("### Quick actions")
 
 _QUICK_ACTIONS = [
-    ("survey-runner", "pages/1_Survey_Runner.py", "New Survey"),
-    ("experiments", "pages/3_Experiments.py", "Run Experiment"),
-    ("results", "pages/2_Results.py", "View Latest Results"),
-    ("validation", "pages/4_Validation.py", "Validate Panel"),
+    ("survey-runner", "pages/3_Survey_Runner.py", "New Survey"),
+    ("experiments", "pages/5_Experiments.py", "Run Experiment"),
+    ("results", "pages/4_Results.py", "View Latest Results"),
+    ("validation", "pages/6_Validation.py", "Validate Panel"),
 ]
 actions = [a for a in _QUICK_ACTIONS if a[0] in auth.allowed_pages(user)][:3]
 for column, (slug, page, label) in zip(st.columns(len(actions)), actions, strict=False):

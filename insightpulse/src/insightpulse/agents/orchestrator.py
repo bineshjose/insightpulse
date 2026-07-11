@@ -37,7 +37,7 @@ from insightpulse.agents.diversity_monitor import diversity_monitor_node
 from insightpulse.agents.survey_designer import survey_designer_node
 from insightpulse.agents.twin_orchestrator import twin_orchestrator_node
 from insightpulse.agents.validator import validator_node
-from insightpulse.models.agent_state import SurveyPipelineState
+from insightpulse.core.models.agent_state import SurveyPipelineState
 
 logger = structlog.get_logger(__name__)
 

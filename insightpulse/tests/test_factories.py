@@ -9,28 +9,25 @@ from __future__ import annotations
 
 import pytest
 
+from insightpulse.analytics import get_insight_engine
+from insightpulse.analytics.insights import BasicInsightEngine, FullInsightEngine
 from insightpulse.config.settings import Environment
-from insightpulse.layers import (
-    get_calibration_engine,
-    get_data_repository,
-    get_embedding_engine,
-    get_generation_engine,
-    get_insight_engine,
-)
-from insightpulse.layers.calibration_layer import (
+from insightpulse.data.repositories import CSVRepository, SQLRepository, get_data_repository
+from insightpulse.ml.calibration import (
     SimpleCalibrationEngine,
     SinkhornCalibrationEngine,
+    get_calibration_engine,
 )
-from insightpulse.layers.data_layer import CSVRepository, SQLRepository
-from insightpulse.layers.embedding_layer import (
+from insightpulse.ml.embeddings import (
     PrecomputedEmbeddingEngine,
     TransformerEmbeddingEngine,
+    get_embedding_engine,
 )
-from insightpulse.layers.generative_layer import (
+from insightpulse.ml.generation import (
     DemoGenerationEngine,
     LLMGenerationEngine,
+    get_generation_engine,
 )
-from insightpulse.layers.insight_layer import BasicInsightEngine, FullInsightEngine
 
 _DEMO_LIKE = [Environment.DEMO, Environment.TEST]
 

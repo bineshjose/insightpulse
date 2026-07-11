@@ -16,7 +16,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: infra/docker/Dockerfile.app
     container_name: insightpulse-app
     env_file: .env
     environment:
@@ -43,7 +43,7 @@ services:
   dashboard:
     build:
       context: .
-      dockerfile: Dockerfile.streamlit
+      dockerfile: infra/docker/Dockerfile.dashboard
     container_name: insightpulse-dashboard
     env_file: .env
     environment:

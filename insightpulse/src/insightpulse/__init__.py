@@ -10,7 +10,7 @@ with NielsenIQ.
 Author: Binesh Jose (CH24M521)
 """
 
-from insightpulse.exceptions import (
+from insightpulse.core.exceptions import (
     BudgetExceededError,
     CalibrationError,
     CircuitBreakerOpenError,

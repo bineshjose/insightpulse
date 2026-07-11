@@ -1,9 +1,10 @@
-"""FastAPI REST layer: request hardening and rate limiting.
+"""FastAPI REST layer: application, routes, and middleware.
 
-The application itself lives in :mod:`insightpulse.main`; this package
-holds the API-boundary middleware and helpers.
+The application lives in :mod:`insightpulse.api.app`; endpoint logic in
+:mod:`insightpulse.api.routes`; boundary hardening (rate limiting and
+optional API-key auth) in :mod:`insightpulse.api.middleware`.
 """
 
-from insightpulse.api.rate_limit import SlidingWindowRateLimiter
+from insightpulse.api.middleware.rate_limit import SlidingWindowRateLimiter
 
 __all__ = ["SlidingWindowRateLimiter"]

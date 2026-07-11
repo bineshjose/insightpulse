@@ -1,7 +1,7 @@
 """AuditAgent — thin orchestration wrapper over L5, plus provenance.
 
 Delegates result compilation to the environment's
-:class:`~insightpulse.layers.insight_layer.InsightEngine` (per-question
+:class:`~insightpulse.analytics.insights.InsightEngine` (per-question
 distributions, entropy, demographic breakdowns in production) and keeps
 what is genuinely the auditor's job: the provenance hash that makes a run
 replayable, and the run-level quality rates computed over ALL responses —
@@ -22,7 +22,7 @@ import json
 import time
 from typing import Any
 
-from insightpulse.layers import get_insight_engine
+from insightpulse.analytics import get_insight_engine
 from insightpulse.utils import metrics as m
 from insightpulse.utils.logging import get_logger
 

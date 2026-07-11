@@ -19,7 +19,7 @@ help: ## Show this help message
 demo: ## Start the demo environment (Docker Desktop)
 	@echo "🚀 Starting InsightPulse in demo mode..."
 	@cp -n .env.example .env 2>/dev/null || true
-	@test -f data/synthetic/panelists.csv || \
+	@test -f data/demo/panelists.csv || \
 		echo "⚠  Sample data missing — run 'make generate-data' first for full demo functionality."
 	docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
 
@@ -55,8 +55,25 @@ format: ## Auto-format code
 
 # --- Data ---
 
+# --- Data engineering ---
+
+etl-ingest: ## Run benchmark ingestion pipelines (external sources -> ADLS)
+	python -c "from insightpulse.data.etl.ingestion import PewIngestionPipeline, ESSIngestionPipeline, Twin2KIngestionPipeline; [p(dry_run=True).run(v) for p, v in [(PewIngestionPipeline, '119'), (ESSIngestionPipeline, '11'), (Twin2KIngestionPipeline, 'main')]]"
+
+etl-cohort: ## Extract a cohort working set (Snowflake/CSV -> Redis/in-process)
+	python -c "from insightpulse.data.etl import CohortExtractionPipeline; print(CohortExtractionPipeline(run_id='manual', cohort_size=1000, dry_run=True).run().to_dict())"
+
+etl-benchmarks: ## Run benchmark ETL (ADLS -> PostgreSQL)
+	python -c "from insightpulse.data.etl import BenchmarkETLPipeline; print(BenchmarkETLPipeline(source='pew', version='119', dry_run=True).run().to_dict())"
+
+etl-quality: ## Run the data quality gate against the active panel
+	python -c "import pandas as pd; from insightpulse.data.etl.quality import run_checks, NullCheck, UniqueCheck, SchemaCheck; r = run_checks(pd.read_csv('data/demo/panelists.csv'), [SchemaCheck(['panelist_id','age_group']), UniqueCheck('panelist_id'), NullCheck()]); print(f'passed={r.passed} warnings={r.warnings} failures={r.failures}')"
+
+data-explore: ## Print the EDA summary for the active panel
+	python -c "import pandas as pd; from insightpulse.analytics.eda import PanelistAnalyzer, PurchaseAnalyzer; print(PanelistAnalyzer(pd.read_csv('data/demo/panelists.csv')).summary()); print(PurchaseAnalyzer(pd.read_csv('data/demo/purchases.csv')).summary())"
+
 generate-data: ## Generate synthetic sample data for demo mode
-	python -m data.synthetic.generate_sample_data
+	python -m data.demo.generate_sample_data
 
 # --- Experiments ---
 

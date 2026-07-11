@@ -1,7 +1,7 @@
 """CalibrationAgent — thin orchestration wrapper over the L4 layer.
 
 Delegates all transport mathematics to the environment's
-:class:`~insightpulse.layers.calibration_layer.CalibrationEngine`
+:class:`~insightpulse.ml.calibration.CalibrationEngine`
 (SimpleCalibrationEngine in demo, SinkhornCalibrationEngine in
 production — selected by the layer factory, never by branches here).
 
@@ -26,8 +26,8 @@ from typing import Any
 
 import numpy as np
 
-from insightpulse.exceptions import CalibrationError
-from insightpulse.layers import get_calibration_engine
+from insightpulse.core.exceptions import CalibrationError
+from insightpulse.ml.calibration import get_calibration_engine
 from insightpulse.utils.logging import get_logger
 
 logger = get_logger(__name__)
