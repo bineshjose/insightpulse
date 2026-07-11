@@ -237,7 +237,7 @@ export function storeLastRun(run: SurveyRunResponse): void {
   }
 }
 
-/** The latest live run, or null (callers fall back to SAMPLE_RUN). */
+/** The latest live run, or null (callers fall back to LATEST_RUN). */
 export function loadLastRun(): SurveyRunResponse | null {
   try {
     const stored = window.localStorage.getItem(LAST_RUN_KEY);

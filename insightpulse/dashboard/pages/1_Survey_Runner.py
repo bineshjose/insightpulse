@@ -357,6 +357,6 @@ st.plotly_chart(
     use_container_width=True,
     config=PLOTLY_CONFIG,
 )
-nav.page_link("pages/2_📊_Results.py", label="→ Full results, metrics, and breakdowns")
+nav.page_link("pages/2_Results.py", label="→ Full results, metrics, and breakdowns")
 
 theme.footer()

@@ -24,7 +24,7 @@ if not history:
     st.info("No results yet — run a survey to get started.", icon="✨")
     can_run = data_loader.data_available() and auth.has_permission(user, "run")
     if can_run and st.button("Run a survey now", type="primary"):
-        st.switch_page("pages/1_🎯_Survey_Runner.py")
+        st.switch_page("pages/1_Survey_Runner.py")
     theme.footer()
     st.stop()
 

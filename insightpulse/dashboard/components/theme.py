@@ -278,9 +278,11 @@ label[data-baseweb="checkbox"]:has(input[aria-checked="true"]) > div:first-of-ty
     border-color: {NAVY};
 }}
 
-/* One eye icon only: suppress the browser-native password reveal so it
-   doesn't double up with Streamlit's toggle. */
-input::-ms-reveal, input::-ms-clear {{ display: none; }}
+/* One eye icon only: suppress the browser-native password reveal and any
+   duplicate toggle so exactly one functional eye remains. */
+input::-ms-reveal, input::-ms-clear {{ display: none !important; }}
+[data-testid="stPasswordInputToggle"] button:first-child {{ display: none; }}
+[data-testid="stTextInputRootElement"] button:nth-of-type(2) {{ display: none; }}
 
 /* ---- progress ---- */
 .stProgress > div > div > div > div {{ background-color: {NAVY}; }}

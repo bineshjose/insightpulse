@@ -76,11 +76,15 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={"family": FONT_FAMILY, "color": SECONDARY_INK, "size": 12},
-        margin={"l": 8, "r": 8, "t": 48 if title else 16, "b": 8},
+        # Extra headroom whenever a title shares the top band with the
+        # legend (title anchors left, legend anchors right).
+        margin={"l": 8, "r": 8, "t": 76 if title else 40, "b": 8},
+        # Legend rides above the plot area, right-aligned — clear of both
+        # the title (top-left) and the bars.
         legend={
             "orientation": "h",
             "yanchor": "bottom", "y": 1.02,
-            "xanchor": "left", "x": 0.0,
+            "xanchor": "right", "x": 1.0,
             "font": {"color": SECONDARY_INK},
         },
         bargap=0.35,
@@ -90,7 +94,10 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
     # Only set a title when one exists — a None title leaves stray
     # "undefined" text in the rendered chart on some plotly.js builds.
     if title:
-        fig.update_layout(title=title, title_font={"color": "#003865", "size": 15})
+        fig.update_layout(
+            title={"text": title, "yanchor": "top", "y": 0.97},
+            title_font={"color": "#003865", "size": 15},
+        )
     fig.update_xaxes(
         showgrid=False, linecolor=AXIS_LINE, linewidth=1,
         tickfont={"color": MUTED_INK, "size": 11},

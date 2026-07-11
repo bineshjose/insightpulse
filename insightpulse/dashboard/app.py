@@ -40,27 +40,27 @@ auth.render_sidebar(user)
 pages = [
     st.Page("views/home.py", title="Home", icon=":material/home:", default=True),
     st.Page(
-        "pages/1_🎯_Survey_Runner.py", title="Survey Runner",
+        "pages/1_Survey_Runner.py", title="Survey Runner",
         icon=":material/checklist:", url_path="survey-runner",
     ),
     st.Page(
-        "pages/2_📊_Results.py", title="Results",
+        "pages/2_Results.py", title="Results",
         icon=":material/monitoring:", url_path="results",
     ),
     st.Page(
-        "pages/3_🧪_Experiments.py", title="Experiments",
+        "pages/3_Experiments.py", title="Experiments",
         icon=":material/science:", url_path="experiments",
     ),
     st.Page(
-        "pages/4_✅_Validation.py", title="Validation",
+        "pages/4_Validation.py", title="Validation",
         icon=":material/verified:", url_path="validation",
     ),
     st.Page(
-        "pages/5_📋_Audit.py", title="Audit",
+        "pages/5_Audit.py", title="Audit",
         icon=":material/receipt_long:", url_path="audit",
     ),
     st.Page(
-        "pages/6_👤_Profile.py", title="Profile",
+        "pages/6_Profile.py", title="Profile",
         icon=":material/account_circle:", url_path="profile",
     ),
 ]

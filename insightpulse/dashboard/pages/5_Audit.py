@@ -37,7 +37,7 @@ if run is None:
         "No survey run in this session yet — run one from the Survey Runner page.",
         icon="✨",
     )
-    nav.page_link("pages/1_🎯_Survey_Runner.py", label="→ Survey Runner")
+    nav.page_link("pages/1_Survey_Runner.py", label="→ Survey Runner")
     theme.footer()
     st.stop()
 

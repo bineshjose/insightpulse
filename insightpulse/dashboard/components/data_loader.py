@@ -31,12 +31,12 @@ REQUIRED_FILES = ("panelists.csv", "purchases.csv", "survey_responses.csv")
 
 
 def data_available() -> bool:
-    """Check whether all synthetic sample CSVs exist."""
+    """Check whether all panel data CSVs exist."""
     return all((DATA_DIR / f).exists() for f in REQUIRED_FILES)
 
 
 def require_data() -> bool:
-    """Render a call-to-action and stop rendering if sample data is missing.
+    """Render a call-to-action and stop rendering if panel data is missing.
 
     Returns:
         True if data is available (page can continue rendering).

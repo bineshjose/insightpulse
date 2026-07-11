@@ -300,8 +300,11 @@ div[data-testid="stForm"] {{
 }}
 /* No "Press Enter to submit form" hints on the credential fields. */
 .stTextInput div[data-testid="InputInstructions"] {{ display: none; }}
-/* One eye icon only: suppress the browser-native password reveal. */
-input::-ms-reveal, input::-ms-clear {{ display: none; }}
+/* One eye icon only: suppress the browser-native password reveal and any
+   duplicate toggle so exactly one functional eye remains. */
+input::-ms-reveal, input::-ms-clear {{ display: none !important; }}
+[data-testid="stPasswordInputToggle"] button:first-child {{ display: none; }}
+[data-testid="stTextInputRootElement"] button:nth-of-type(2) {{ display: none; }}
 .login-tagline {{
     color: rgba(255,255,255,0.85);
     text-align: center;
