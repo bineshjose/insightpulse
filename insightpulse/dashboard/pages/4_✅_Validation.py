@@ -16,23 +16,27 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import data_loader, simulation
+from components import auth, data_loader, simulation, theme
 from components.charts import STATUS, distribution_chart
 
 sys.path.insert(0, str(data_loader.REPO_ROOT / "src"))
 from insightpulse.utils import metrics as m
 
-st.set_page_config(page_title="Validation — InsightPulse", page_icon="✅", layout="wide")
+st.set_page_config(page_title="Validation | InsightPulse", page_icon="✅", layout="wide")
 
-st.title("✅ Validation")
-st.markdown(
+user = auth.require_auth("analyze")
+theme.apply()
+auth.render_sidebar(user)
+theme.page_header(
+    "✅ Validation",
     "Cross-validation of the synthetic panel against empirical ground truth. "
-    "In demo mode the ground truth is the historical response bank from the "
-    "sample data; in production this slot is filled by **Pew ATP** and "
-    "**ESS** benchmark waves."
+    "In demo mode the ground truth is the historical response bank; in "
+    "production this slot is filled by Pew ATP and ESS benchmark waves.",
+    "Validation",
 )
 
 if not data_loader.require_data():
+    theme.footer()
     st.stop()
 
 # Thesis acceptance targets per metric.
@@ -63,7 +67,12 @@ if st.button("▶ Run cross-validation"):
 
 run = st.session_state.get("validation_run")
 if run is None:
-    st.info("Press **Run cross-validation** to compare synthetic vs. empirical.")
+    st.info(
+        "No validation results yet — press **Run cross-validation** to compare "
+        "synthetic vs. empirical.",
+        icon="✨",
+    )
+    theme.footer()
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -198,5 +207,9 @@ st.dataframe(pd.DataFrame({
 }), use_container_width=True, hide_index=True)
 st.caption(
     "Benchmark CSVs drop into `data/benchmarks/` with the same schema as "
-    "`survey_responses.csv`; the validation above runs unchanged against them."
+    "`survey_responses.csv`; the validation above runs unchanged against them. "
+    "Sources: Pew Research Center American Trends Panel (waves 2023-2025); "
+    "European Social Survey (ESS round 11); Toubia et al., Twin-2K-500 (2024)."
 )
+
+theme.footer()

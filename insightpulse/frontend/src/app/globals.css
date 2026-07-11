@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* NielsenIQ theme variables — shadcn-style primitives read these. */
+:root {
+  --niq-navy: #003865;
+  --niq-blue: #00a4e4;
+  --niq-bg: #f7f8fa;
+}
+
+body {
+  @apply bg-niq-bg text-niq-text antialiased;
+}

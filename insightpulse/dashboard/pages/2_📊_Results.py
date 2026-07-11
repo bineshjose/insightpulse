@@ -13,16 +13,27 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import data_loader, simulation
+from components import auth, data_loader, simulation, theme
 from components.charts import CATEGORICAL, distribution_chart
 
-st.set_page_config(page_title="Results — InsightPulse", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Results | InsightPulse", page_icon="📊", layout="wide")
 
-st.title("📊 Survey Results")
+user = auth.require_auth("analyze")
+theme.apply()
+auth.render_sidebar(user)
+theme.page_header(
+    "📊 Survey Results",
+    "Raw vs calibrated vs empirical distributions, the full metric suite, "
+    "and demographic breakdowns.",
+    "Results",
+)
 
 run = simulation.get_last_run()
 if run is None:
-    st.info("No survey run in this session yet.")
+    st.info(
+        "No results yet — run a survey to get started, or generate a demo run below.",
+        icon="✨",
+    )
     if data_loader.data_available() and st.button("Generate a demo run"):
         catalog = data_loader.question_catalog()
         panelists = data_loader.load_panelists()
@@ -34,6 +45,7 @@ if run is None:
         )
         simulation.store_run(demo)
         st.rerun()
+    theme.footer()
     st.stop()
 
 totals = run["totals"]
@@ -66,7 +78,16 @@ st.divider()
 st.subheader("Response distributions")
 
 for result in run["question_results"]:
-    st.markdown(f"**{result['text']}**")
+    js_before = result["metrics_raw"]["js_divergence"]
+    js_after = result["metrics_calibrated"]["js_divergence"]
+    badge = ""
+    if config["calibration_applied"] and js_before > 0:
+        improvement = (js_before - js_after) / js_before * 100
+        badge = (
+            f'&nbsp;<span class="niq-badge" style="background:{theme.GREEN};">'
+            f"↑ {improvement:.0f}% improvement</span>"
+        )
+    st.markdown(f"**{result['text']}**{badge}", unsafe_allow_html=True)
 
     def _pct(counts: list[float]) -> list[float]:
         total = max(sum(counts), 1)
@@ -164,10 +185,33 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.subheader("Export")
-csv_bytes = responses.drop(columns=["validation_flags"]).to_csv(index=False).encode()
-st.download_button(
-    "⬇️ Download responses (CSV)",
-    data=csv_bytes,
-    file_name=f"insightpulse_run_{run['run_id']}.csv",
-    mime="text/csv",
-)
+if auth.has_permission(user, "export"):
+    import json as _json
+
+    csv_bytes = responses.drop(columns=["validation_flags"]).to_csv(index=False).encode()
+    export_col1, export_col2 = st.columns(2)
+    with export_col1:
+        if st.download_button(
+            "⬇️ Download responses (CSV)",
+            data=csv_bytes,
+            file_name=f"insightpulse_run_{run['run_id']}.csv",
+            mime="text/csv",
+        ):
+            auth.record_activity("Exported results", f"Run {run['run_id']} — CSV")
+    with export_col2:
+        results_json = _json.dumps(run["question_results"], indent=2, default=str)
+        if st.download_button(
+            "⬇️ Download metrics (JSON)",
+            data=results_json,
+            file_name=f"insightpulse_run_{run['run_id']}_metrics.json",
+            mime="application/json",
+        ):
+            auth.record_activity("Exported results", f"Run {run['run_id']} — JSON")
+else:
+    st.info(
+        f"Export requires the 'export' capability — not included in the "
+        f"{user['tier']} tier. Contact your administrator.",
+        icon="🔒",
+    )
+
+theme.footer()

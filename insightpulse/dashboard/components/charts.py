@@ -21,50 +21,32 @@ from collections.abc import Sequence
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- Validated categorical palette (fixed order — the order IS the CVD-safety
-# mechanism; never reorder or cycle past 8) ---
-CATEGORICAL: list[str] = [
-    "#2a78d6",  # 1 blue
-    "#1baf7a",  # 2 aqua
-    "#eda100",  # 3 yellow
-    "#008300",  # 4 green
-    "#4a3aa7",  # 5 violet
-    "#e34948",  # 6 red
-    "#e87ba4",  # 7 magenta
-    "#eb6834",  # 8 orange
-]
+# --- NielsenIQ categorical palette, validated with the dataviz checker
+# (worst adjacent CVD ΔE 14.2 on white). Single source: components.theme —
+# the order IS the CVD-safety mechanism; never reorder or cycle past 8. ---
+from components.theme import CHART_SERIES as CATEGORICAL
+from components.theme import MODEL_COLORS, SERIES_COLORS
 
-# Color follows the entity: these assignments hold on every page.
-SERIES_COLORS: dict[str, str] = {
-    "Synthetic (raw)": CATEGORICAL[0],
-    "Calibrated": CATEGORICAL[1],
-    "Empirical": CATEGORICAL[2],
-}
-
-MODEL_COLORS: dict[str, str] = {
-    "claude-sonnet-4-6": CATEGORICAL[0],
-    "gpt-4o": CATEGORICAL[1],
-    "ollama/llama3.1": CATEGORICAL[2],
-    "claude-haiku-4-5": CATEGORICAL[3],
-}
-
-# One-hue ordinal ramp for Likert scales (validated with --ordinal).
-ORDINAL_BLUES: list[str] = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"]
+# One-hue ordinal ramp for Likert scales (NIQ blue, light→dark; validated
+# with the dataviz checker's --ordinal mode).
+ORDINAL_BLUES: list[str] = ["#4DBEE9", "#189FD6", "#0080B5", "#00618F", "#004669"]
 
 # Status palette — reserved meaning, always paired with icon + label.
 STATUS: dict[str, str] = {
-    "good": "#0ca30c",
-    "warning": "#fab219",
-    "serious": "#ec835a",
-    "critical": "#d03b3b",
+    "good": "#6CC24A",
+    "warning": "#F2A900",
+    "serious": "#E07B39",
+    "critical": "#E03C31",
 }
 
 # Chart chrome (light surface).
-GRIDLINE = "#e1e0d9"
-AXIS_LINE = "#c3c2b7"
-MUTED_INK = "#898781"
-SECONDARY_INK = "#52514e"
-FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", sans-serif'
+GRIDLINE = "#E5E7EB"
+AXIS_LINE = "#CBD2D9"
+MUTED_INK = "#6B7280"
+SECONDARY_INK = "#4B5563"
+FONT_FAMILY = (
+    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+)
 
 
 def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 380) -> go.Figure:
@@ -84,7 +66,7 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={"family": FONT_FAMILY, "color": SECONDARY_INK, "size": 12},
-        title_font={"color": "#0b0b0b", "size": 15},
+        title_font={"color": "#003865", "size": 15},
         margin={"l": 8, "r": 8, "t": 48 if title else 16, "b": 8},
         legend={
             "orientation": "h",

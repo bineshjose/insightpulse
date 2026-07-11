@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 120" role="img" aria-label="InsightPulse">
+  <!-- Icon: rounded tile with data bars and a pulse wave -->
+  <g>
+    <rect x="4" y="10" width="100" height="100" rx="22" fill="#003865"/>
+    <!-- bar chart motif -->
+    <rect x="24" y="62" width="12" height="28" rx="3" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="42" y="50" width="12" height="40" rx="3" fill="#FFFFFF" opacity="0.55"/>
+    <rect x="60" y="40" width="12" height="50" rx="3" fill="#FFFFFF" opacity="0.75"/>
+    <rect x="78" y="30" width="12" height="60" rx="3" fill="#FFFFFF" opacity="0.9"/>
+    <!-- pulse wave overlay -->
+    <path d="M14 58 L34 58 L44 34 L58 76 L68 48 L76 58 L94 58"
+          fill="none" stroke="#00A4E4" stroke-width="7"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="126" y="76" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        font-size="52" font-weight="700" fill="#003865">Insight<tspan fill="#00A4E4">Pulse</tspan></text>
+  <text x="128" y="102" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        font-size="17" font-weight="500" fill="#6B7280" letter-spacing="1.5">SYNTHETIC SURVEY INTELLIGENCE</text>
+</svg>

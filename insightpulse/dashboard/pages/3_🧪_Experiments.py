@@ -16,7 +16,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import data_loader, simulation
+from components import auth, data_loader, simulation, theme
 from components.charts import (
     MODEL_COLORS,
     convergence_chart,
@@ -27,11 +27,20 @@ from components.charts import (
 sys.path.insert(0, str(data_loader.REPO_ROOT / "src"))
 from insightpulse.utils import metrics as m
 
-st.set_page_config(page_title="Experiments — InsightPulse", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Experiments | InsightPulse", page_icon="🧪", layout="wide")
 
-st.title("🧪 Experiments")
+user = auth.require_auth("run")
+theme.apply()
+auth.render_sidebar(user)
+theme.page_header(
+    "🧪 Experiments",
+    "Multi-LLM comparison, calibration convergence, drift monitoring, and "
+    "sequential-dependency analysis — each answering an evaluator question.",
+    "Experiments",
+)
 
 if not data_loader.require_data():
+    theme.footer()
     st.stop()
 
 panelists = data_loader.load_panelists()
@@ -76,6 +85,9 @@ if st.button("▶ Run comparison", key="run_llm"):
         progress.progress((i + 1) / len(models))
     progress.empty()
     st.session_state["llm_comparison"] = pd.DataFrame(rows)
+    auth.record_activity(
+        "Ran experiment", f"Multi-LLM Comparison ({len(models)} models, seed {llm_seed})"
+    )
 
 if "llm_comparison" in st.session_state:
     comparison: pd.DataFrame = st.session_state["llm_comparison"]
@@ -242,3 +254,5 @@ with col2:
         "reports being “Extremely” affected by snack promotions. Prior "
         "answers are threaded through SurveyQuestion.prior_questions."
     )
+
+theme.footer()

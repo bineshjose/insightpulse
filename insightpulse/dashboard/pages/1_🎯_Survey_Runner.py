@@ -15,18 +15,33 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import data_loader, nav, simulation
+from components import auth, data_loader, nav, simulation, theme
 from components.charts import distribution_chart
 
-st.set_page_config(page_title="Survey Runner — InsightPulse", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Survey Runner | InsightPulse", page_icon="🎯", layout="wide")
 
-st.title("🎯 Survey Runner")
-st.markdown(
+user = auth.require_auth("run")
+theme.apply()
+auth.render_sidebar(user)
+theme.page_header(
+    "🎯 Survey Runner",
     "Configure a pulse survey, select a target cohort, and execute it "
-    "against a panel of digital-twin respondents."
+    "against a panel of digital-twin respondents.",
+    "Survey Runner",
+)
+
+st.markdown(
+    f"""
+<div style="display:flex; gap:0.5rem; margin-bottom:0.8rem; flex-wrap:wrap;">
+  {"".join(f'<span class="niq-badge" style="background:{theme.NAVY};">{step}</span>'
+           for step in ("1 · Questions", "2 · Cohort", "3 · Configure", "4 · Run"))}
+</div>
+""",
+    unsafe_allow_html=True,
 )
 
 if not data_loader.require_data():
+    theme.footer()
     st.stop()
 
 panelists = data_loader.load_panelists()
@@ -65,12 +80,24 @@ with st.form("survey_config"):
             sorted(panelists["behavioral_archetype"].unique()),
             default=[],
         )
-    cohort_size = st.slider("Cohort size", min_value=10, max_value=500, value=100, step=10)
+    max_cohort = min(500, user["max_cohort_size"])
+    cohort_size = st.slider(
+        "Cohort size", min_value=10, max_value=max_cohort,
+        value=min(100, max_cohort), step=10,
+        help=f"Your {user['tier']} tier allows up to {user['max_cohort_size']:,} respondents.",
+    )
 
     st.subheader("3 · Execution")
     col3, col4, col5 = st.columns(3)
     with col3:
-        model = st.selectbox("LLM model", list(simulation.MODEL_PROFILES))
+        model_options = list(simulation.MODEL_PROFILES)
+        default_model = st.session_state.get("user_prefs", {}).get(
+            "default_model", model_options[0]
+        )
+        model = st.selectbox(
+            "LLM model", model_options,
+            index=model_options.index(default_model) if default_model in model_options else 0,
+        )
     with col4:
         seed = st.number_input("Random seed", value=42, min_value=0, step=1)
     with col5:
@@ -111,11 +138,15 @@ if submitted:
     cohort = cohort_pool.sample(n=effective_size, random_state=int(seed))
 
     if mode.startswith("Local"):
-        with st.spinner("Simulating the 8-agent pipeline..."):
+        with st.spinner("Running the 8-agent pipeline (local simulation)..."):
             run = simulation.simulate_survey_run(
                 questions, cohort, model, seed=int(seed), calibrate=calibrate
             )
         simulation.store_run(run)
+        auth.record_activity(
+            "Ran survey",
+            f"{len(questions)} question(s), {effective_size} respondents, {model}",
+        )
     else:
         payload = {
             "questions": [q["text"] for q in questions],
@@ -147,7 +178,12 @@ if submitted:
 
 run = simulation.get_last_run()
 if run is None:
-    st.info("Configure a survey above and press **Run Survey** to see results.")
+    st.info(
+        "No results yet — configure a survey above and press **Run Survey** "
+        "to get started.",
+        icon="✨",
+    )
+    theme.footer()
     st.stop()
 
 totals = run["totals"]
@@ -178,3 +214,5 @@ st.plotly_chart(
     use_container_width=True,
 )
 nav.page_link("pages/2_📊_Results.py", label="→ Full results, metrics, and breakdowns")
+
+theme.footer()

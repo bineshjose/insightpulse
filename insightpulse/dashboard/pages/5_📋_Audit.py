@@ -14,17 +14,29 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import nav, simulation
+from components import auth, nav, simulation, theme
 from components.charts import agent_timeline_chart
 
-st.set_page_config(page_title="Audit — InsightPulse", page_icon="📋", layout="wide")
+st.set_page_config(page_title="Audit | InsightPulse", page_icon="📋", layout="wide")
 
-st.title("📋 Audit Trail")
+user = auth.require_auth("analyze")
+theme.apply()
+auth.render_sidebar(user)
+theme.page_header(
+    "📋 Audit Trail",
+    "Provenance, agent execution timeline, quality gates, and everything "
+    "needed to reproduce a run exactly.",
+    "Audit",
+)
 
 run = simulation.get_last_run()
 if run is None:
-    st.info("No survey run in this session yet — run one from the Survey Runner page.")
+    st.info(
+        "No survey run in this session yet — run one from the Survey Runner page.",
+        icon="✨",
+    )
     nav.page_link("pages/1_🎯_Survey_Runner.py", label="→ Survey Runner")
+    theme.footer()
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -149,9 +161,19 @@ audit_record = {
         for r in run["question_results"]
     ],
 }
-st.download_button(
-    "⬇️ Export audit record (JSON)",
-    data=json.dumps(audit_record, indent=2, default=str),
-    file_name=f"audit_{run['run_id']}.json",
-    mime="application/json",
-)
+if auth.has_permission(user, "export"):
+    if st.download_button(
+        "⬇️ Export audit record (JSON)",
+        data=json.dumps(audit_record, indent=2, default=str),
+        file_name=f"audit_{run['run_id']}.json",
+        mime="application/json",
+    ):
+        auth.record_activity("Exported audit record", f"Run {run['run_id']} — JSON")
+else:
+    st.info(
+        f"Audit export requires the 'export' capability — not included in the "
+        f"{user['tier']} tier.",
+        icon="🔒",
+    )
+
+theme.footer()

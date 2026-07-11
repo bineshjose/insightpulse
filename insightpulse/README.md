@@ -69,13 +69,23 @@ make generate-data
 streamlit run dashboard/app.py
 ```
 
-### Docker (full stack: API + dashboard)
+### Docker (full stack: API + both frontends)
 
 ```bash
 cp .env.example .env        # add ANTHROPIC_API_KEY / OPENAI_API_KEY for live LLM runs
 make demo                   # docker compose up with the demo profile
-# Dashboard: http://localhost:8501   API: http://localhost:8000/docs
+# Streamlit dashboard: http://localhost:8501
+# React frontend:      http://localhost:3000
+# API:                 http://localhost:8000/docs
 ```
+
+Both frontends are auth-gated with the same demo accounts:
+
+| Account | Email | Password | Access |
+|---|---|---|---|
+| Administrator | `binesh.jose@nielseniq.com` | `Ch24m521` | Full (create/run/analyze/export/calibrate) |
+| Evaluator | `evaluator@iitm.ac.in` | `eval2024` | View & analyze only |
+| Demo analyst | `demo@insightpulse.ai` | `demo123` | Create/run/analyze (no export) |
 
 Real LLM generation routes through LiteLLM (Claude, OpenAI, Ollama). Without API
 keys, every dashboard page and experiment still works through the built-in
