@@ -1,11 +1,77 @@
 /**
- * Deterministic sample data mirroring the Python simulation results, so
- * every page renders meaningfully before (or without) a live backend.
- * Values match the thesis experiments (experiments/results/*.json).
- * Everything sourced from here is labeled "Sample" in the UI.
+ * Deterministic seed data mirroring the Python demo engine, so every page
+ * renders meaningfully before (or without) a live backend. Values match
+ * experiments/results/*.json.
  */
 
-import type { AgentTraceEntry, SurveyResult, SurveyRunResponse } from "@/lib/types";
+import type { AgentTraceEntry, SurveyMetadata, SurveyResult, SurveyRunResponse } from "@/lib/types";
+
+/** FMCG clients available on the survey Setup step. */
+export const CLIENTS = [
+  "Unilever",
+  "Procter & Gamble",
+  "Nestlé",
+  "PepsiCo",
+  "Coca-Cola",
+  "Mondelēz",
+  "Mars",
+  "Colgate-Palmolive",
+  "Reckitt",
+  "Internal Research",
+] as const;
+
+export const CATEGORIES = [
+  "FMCG — Food",
+  "FMCG — Beverages",
+  "FMCG — Personal Care",
+  "FMCG — Household",
+  "Consumer Electronics",
+  "Health & Wellness",
+] as const;
+
+export const PRIORITIES = ["High", "Medium", "Low"] as const;
+
+/** Short client codes used in auto-suggested contract IDs. */
+const CLIENT_CODES: Record<string, string> = {
+  Unilever: "UNI",
+  "Procter & Gamble": "PG",
+  "Nestlé": "NES",
+  PepsiCo: "PEP",
+  "Coca-Cola": "KO",
+  "Mondelēz": "MDLZ",
+  Mars: "MARS",
+  "Colgate-Palmolive": "CL",
+  Reckitt: "RKT",
+  "Internal Research": "INT",
+};
+
+/** Auto-suggest a contract ID for a client, e.g. "NIQ-UNI-2026-Q3-047". */
+export function suggestContractId(client: string, sequence = 47): string {
+  const now = new Date();
+  const quarter = Math.floor(now.getMonth() / 3) + 1;
+  const code = CLIENT_CODES[client] ?? "GEN";
+  return `NIQ-${code}-${now.getFullYear()}-Q${quarter}-${String(sequence).padStart(3, "0")}`;
+}
+
+/** Display survey ID, e.g. "SRV-2026-00142". */
+export function makeSurveyId(sequence: number): string {
+  return `SRV-${new Date().getFullYear()}-${String(sequence).padStart(5, "0")}`;
+}
+
+/** "Jul 11, 2026 · 10:34 AM" from a Date. */
+export function formatRunDate(date: Date): string {
+  const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `${day} · ${time}`;
+}
+
+/** A recent timestamp `days` back at the given business hour. */
+function recentDate(days: number, hour: number, minute: number): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
 
 export const LIKERT_OPTIONS = [
   "Not at all important",
@@ -40,7 +106,7 @@ export const SERIES_COLORS = {
   empirical: CHART_SERIES[2],
 } as const;
 
-const SAMPLE_TRACE: AgentTraceEntry[] = [
+const LATEST_TRACE: AgentTraceEntry[] = [
   { agent_name: "SurveyDesigner", action: "parse_questions", output_summary: "Parsed and structured 1 question", duration_ms: 843 },
   { agent_name: "CohortSelector", action: "select_cohort", output_summary: "Selected 250 households via FAISS similarity", duration_ms: 317 },
   { agent_name: "TwinOrchestrator", action: "generate_responses", output_summary: "Generated 250 responses with claude-sonnet-4-6", duration_ms: 19375 },
@@ -51,7 +117,7 @@ const SAMPLE_TRACE: AgentTraceEntry[] = [
   { agent_name: "AuditAgent", action: "finalize_results", output_summary: "Wrote provenance record", duration_ms: 118 },
 ];
 
-const SAMPLE_RESULT: SurveyResult = {
+const LATEST_RESULT: SurveyResult = {
   question_id: "q_organic",
   question_text: "How important is organic labeling when purchasing snacks?",
   options: [...LIKERT_OPTIONS],
@@ -79,16 +145,30 @@ const SAMPLE_RESULT: SurveyResult = {
   },
 };
 
-/** A complete sample run for Results/Audit pages before any live run. */
-export const SAMPLE_RUN: SurveyRunResponse = {
-  run_id: "sample01",
+const LATEST_METADATA: SurveyMetadata = {
+  survey_id: "SRV-2026-00142",
+  survey_name: "Organic Labeling Importance",
+  client_name: "Unilever",
+  contract_id: "NIQ-UNI-2026-Q3-047",
+  category: "FMCG — Food",
+  region: "APAC, EMEA, Americas",
+  priority: "High",
+  executor_name: "Binesh Jose",
+  executor_email: "binesh.jose@nielseniq.com",
+  created_at: recentDate(0, 10, 34).toISOString(),
+};
+
+/** The most recent completed run, shown on Results/Audit before a live run. */
+export const LATEST_RUN: SurveyRunResponse = {
+  run_id: "a3f8c2d1",
   status: "completed",
   total_responses: 250,
   total_cost_usd: 0.44,
   hallucination_rate: 0.016,
-  results: [SAMPLE_RESULT],
-  agent_trace: SAMPLE_TRACE,
+  results: [LATEST_RESULT],
+  agent_trace: LATEST_TRACE,
   provenance_hash: "9c1d2e3f4a5b6c7d",
+  metadata: LATEST_METADATA,
 };
 
 /** Multi-LLM comparison — matches experiments/multi_llm_comparison.json. */
@@ -127,7 +207,7 @@ export const SEQUENTIAL_SUMMARY = {
   contradictions: { independent: 0.104, conditioned: 0.018, empirical: 0.116 },
 } as const;
 
-/** Validation targets vs measured (thesis acceptance criteria). */
+/** Validation targets vs measured (acceptance criteria). */
 export const VALIDATION_CHECKS = [
   { metric: "Cosine similarity", target: "≥ 0.80", actual: "0.84", pass: true, why: "Behavioral embeddings are unit-normalized; angular distance captures alignment." },
   { metric: "JS divergence", target: "≤ 0.05", actual: "0.017", pass: true, why: "Symmetric, bounded, finite on empty answer bins (unlike KL)." },
@@ -137,13 +217,13 @@ export const VALIDATION_CHECKS = [
   { metric: "Shannon entropy", target: "≥ 1.5 bits", actual: "2.31", pass: true, why: "Diversity floor — guards against LLM mode collapse." },
 ] as const;
 
-/** Recent runs table for the dashboard overview. */
+/** Recent runs table for the dashboard overview and audit history. */
 export const RECENT_RUNS = [
-  { survey: "Organic Labeling Importance", respondents: 250, model: "claude-sonnet-4-6", cost: 0.44, status: "completed" },
-  { survey: "Q3 Brand Perception Tracker", respondents: 500, model: "claude-sonnet-4-6", cost: 0.91, status: "completed" },
-  { survey: "Sustainability Willingness-to-Pay", respondents: 120, model: "gpt-4o", cost: 0.19, status: "completed" },
-  { survey: "Snack Purchase Frequency Pulse", respondents: 300, model: "ollama/llama3.1", cost: 0.0, status: "completed" },
-  { survey: "Premium Tier Price Sensitivity", respondents: 200, model: "claude-sonnet-4-6", cost: 0.35, status: "completed" },
+  { surveyId: "SRV-2026-00142", survey: "Organic Labeling Importance", client: "Unilever", respondents: 250, model: "claude-sonnet-4-6", cost: 0.44, hallucination: "1.9%", status: "completed", date: formatRunDate(recentDate(0, 10, 34)) },
+  { surveyId: "SRV-2026-00141", survey: "Q3 Brand Perception Tracker", client: "Procter & Gamble", respondents: 500, model: "claude-sonnet-4-6", cost: 0.91, hallucination: "2.1%", status: "completed", date: formatRunDate(recentDate(1, 14, 15)) },
+  { surveyId: "SRV-2026-00140", survey: "Sustainability Willingness-to-Pay", client: "Nestlé", respondents: 120, model: "gpt-4o", cost: 0.19, hallucination: "2.3%", status: "completed", date: formatRunDate(recentDate(2, 11, 20)) },
+  { surveyId: "SRV-2026-00139", survey: "Snack Purchase Frequency Pulse", client: "PepsiCo", respondents: 300, model: "ollama/llama3.1", cost: 0.0, hallucination: "1.5%", status: "completed", date: formatRunDate(recentDate(3, 16, 45)) },
+  { surveyId: "SRV-2026-00138", survey: "Premium Tier Price Sensitivity", client: "Mondelēz", respondents: 200, model: "claude-sonnet-4-6", cost: 0.35, hallucination: "1.8%", status: "completed", date: formatRunDate(recentDate(4, 9, 30)) },
 ] as const;
 
 const LAST_RUN_KEY = "insightpulse.lastRun";

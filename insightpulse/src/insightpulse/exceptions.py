@@ -37,7 +37,7 @@ class CircuitBreakerOpenError(GenerationError):
     """L3 fast-fail: the LLM circuit breaker is open; calls are being shed.
 
     Raised *before* any network I/O so callers can immediately fall back
-    (e.g. to the simulated engine) instead of waiting for timeouts.
+    (e.g. to the demo engine) instead of waiting for timeouts.
     """
 
 

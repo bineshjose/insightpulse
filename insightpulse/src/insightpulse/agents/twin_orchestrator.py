@@ -2,7 +2,7 @@
 
 Delegates all response generation to the environment's
 :class:`~insightpulse.layers.generative_layer.GenerationEngine`
-(SimulatedGenerationEngine in demo — statistically faithful, key-free;
+(DemoGenerationEngine in demo — statistically faithful, key-free;
 LLMGenerationEngine in production — concurrent, retried, circuit-broken).
 Persona prompting, response parsing, sequential-question conditioning
 (evaluator feedback #3), and resilience all live in the layer.

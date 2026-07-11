@@ -45,7 +45,7 @@ from experiments.common import (
     save_results,
     setup_experiment,
 )
-from insightpulse import simulation
+from insightpulse import demo_engine
 from insightpulse.utils import metrics as m
 
 # The linked question pair (both ordinal, positively related attitudes).
@@ -96,12 +96,12 @@ def generate_pairs(
         Mode -> {"a": indices, "b": indices} for the full panel.
     """
     rng = np.random.default_rng(seed)
-    panelists = simulation.load_panelists()
-    catalog = {q["question_id"]: q for q in simulation.question_catalog()}
-    cond_a = simulation.archetype_conditionals(
+    panelists = demo_engine.load_panelists()
+    catalog = {q["question_id"]: q for q in demo_engine.question_catalog()}
+    cond_a = demo_engine.archetype_conditionals(
         QUESTION_A, catalog[QUESTION_A]["options"]
     )
-    cond_b = simulation.archetype_conditionals(
+    cond_b = demo_engine.archetype_conditionals(
         QUESTION_B, catalog[QUESTION_B]["options"]
     )
 
@@ -166,7 +166,7 @@ def empirical_reference() -> dict[str, float]:
     Returns:
         Dict with spearman and contradiction metrics for the panel data.
     """
-    responses = simulation.load_survey_responses()
+    responses = demo_engine.load_survey_responses()
     a = responses[responses["question_id"] == QUESTION_A].set_index("panelist_id")
     b = responses[responses["question_id"] == QUESTION_B].set_index("panelist_id")
     joined = a[["answer_index"]].join(
@@ -269,7 +269,7 @@ def main() -> dict[str, Any]:
     if not require_sample_data():
         raise SystemExit(1)
 
-    catalog = {q["question_id"]: q for q in simulation.question_catalog()}
+    catalog = {q["question_id"]: q for q in demo_engine.question_catalog()}
     options_a = catalog[QUESTION_A]["options"]
     options_b = catalog[QUESTION_B]["options"]
 
@@ -283,7 +283,7 @@ def main() -> dict[str, Any]:
     metrics["empirical"] = empirical_reference()
 
     # Marginal-preservation check: conditioning must not distort P(answer_b).
-    empirical_b = simulation.empirical_counts(QUESTION_B, options_b)
+    empirical_b = demo_engine.empirical_counts(QUESTION_B, options_b)
     marginal_js = {
         mode: m.js_divergence(
             np.bincount(data["b"], minlength=len(options_b)), empirical_b

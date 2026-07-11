@@ -90,6 +90,22 @@ export interface SurveyRequest {
   seed?: number;
 }
 
+/** Business provenance attached to a survey run (client, contract, executor). */
+export interface SurveyMetadata {
+  survey_id: string;
+  survey_name: string;
+  client_name: string;
+  contract_id: string;
+  category: string;
+  region: string;
+  priority: string;
+  executor_name: string;
+  executor_email: string;
+  created_at: string;
+  due_date?: string | null;
+  notes?: string;
+}
+
 export interface SurveyRunResponse {
   run_id: string;
   status: string;
@@ -99,6 +115,7 @@ export interface SurveyRunResponse {
   results: SurveyResult[];
   agent_trace: AgentTraceEntry[];
   provenance_hash: string;
+  metadata?: SurveyMetadata;
 }
 
 export interface HealthResponse {

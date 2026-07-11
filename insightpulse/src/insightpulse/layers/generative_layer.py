@@ -4,12 +4,12 @@ Architectural role
     Implements thesis layer L3: each selected panelist becomes a digital
     twin that answers survey questions. The twin is conditioned on
     u_i = [z_i; d_i] from L2 — in the LLM strategy through a structured
-    persona prompt, in the simulated strategy through archetype-conditional
+    persona prompt, in the demo strategy through archetype-conditional
     response distributions.
 
 Design decisions
-    * **Strategy pattern** — :class:`SimulatedGenerationEngine` (demo:
-      statistical simulation, zero network dependencies, reproducible) and
+    * **Strategy pattern** — :class:`DemoGenerationEngine` (demo:
+      statistical twins, zero network dependencies, reproducible) and
       :class:`LLMGenerationEngine` (production: real LLM calls) share the
       :class:`GenerationEngine` contract, so the pipeline cannot tell them
       apart.
@@ -152,10 +152,10 @@ class GenerationEngine(ABC):
 
 
 # ---------------------------------------------------------------------------
-# Demo implementation — statistical simulation
+# Demo implementation — statistical twins
 # ---------------------------------------------------------------------------
 
-class SimulatedGenerationEngine(GenerationEngine):
+class DemoGenerationEngine(GenerationEngine):
     """Demo strategy: archetype-conditional statistical twins.
 
     Single responsibility: reproducible survey responses without any LLM.
@@ -165,16 +165,16 @@ class SimulatedGenerationEngine(GenerationEngine):
     Stage 3 experiments, exposed here behind the L3 contract.
 
     Example:
-        >>> engine = SimulatedGenerationEngine()
+        >>> engine = DemoGenerationEngine()
         >>> responses = await engine.generate_responses(qs, cohort, "gpt-4o")
     """
 
     def __init__(self, config: GenerationConfig | None = None) -> None:
-        """Create the simulated engine.
+        """Create the demo engine.
 
         Args:
             config: Generation settings (used for provenance fields only —
-                the simulation makes no network calls).
+                the demo engine makes no network calls).
         """
         self._config = config or get_settings().generation
 
@@ -186,15 +186,15 @@ class SimulatedGenerationEngine(GenerationEngine):
         seed: int = 42,
         conditioning_vectors: dict[str, np.ndarray] | None = None,
     ) -> list[dict[str, Any]]:
-        """See :meth:`GenerationEngine.generate_responses` (simulated)."""
-        from insightpulse import simulation
+        """See :meth:`GenerationEngine.generate_responses` (demo strategy)."""
+        from insightpulse import demo_engine
 
-        if model not in simulation.MODEL_PROFILES:
+        if model not in demo_engine.MODEL_PROFILES:
             raise GenerationError(
-                f"No simulation profile for model '{model}'. "
-                f"Known: {list(simulation.MODEL_PROFILES)}"
+                f"No demo profile for model '{model}'. "
+                f"Known: {list(demo_engine.MODEL_PROFILES)}"
             )
-        profile = simulation.MODEL_PROFILES[model]
+        profile = demo_engine.MODEL_PROFILES[model]
         rng = np.random.default_rng(seed)
         started = time.perf_counter()
 
@@ -203,15 +203,15 @@ class SimulatedGenerationEngine(GenerationEngine):
             options = question.get("options") or []
             if not options:
                 logger.warning(
-                    "simulated_generation_skipped_open_question",
+                    "demo_generation_skipped_open_question",
                     question_id=question.get("question_id"),
                 )
                 continue
-            conditionals = simulation.archetype_conditionals(
+            conditionals = demo_engine.archetype_conditionals(
                 question["question_id"], options
             )
             distorted = {
-                arch: simulation.model_distribution(base, profile, rng)
+                arch: demo_engine.model_distribution(base, profile, rng)
                 for arch, base in conditionals.items()
             }
             fallback = np.full(len(options), 1.0 / len(options))
@@ -227,8 +227,8 @@ class SimulatedGenerationEngine(GenerationEngine):
                     "answer": options[answer_index],
                     "answer_index": answer_index,
                     "reasoning": (
-                        f"Simulated {archetype or 'panel-average'} response "
-                        f"(archetype-conditional distribution)"
+                        f"Archetype-conditional response "
+                        f"({archetype or 'panel-average'} profile)"
                     ),
                     "confidence": round(
                         float(np.clip(rng.normal(0.78, 0.12), 0.05, 0.99)), 2
@@ -236,7 +236,7 @@ class SimulatedGenerationEngine(GenerationEngine):
                     "model_used": model,
                     "generation_time_ms": float(profile["latency_ms"]),
                     "token_count": int(profile["tokens_per_response"]),
-                    "cost_usd": 0.0,  # simulation never spends
+                    "cost_usd": 0.0,  # the demo engine never spends
                     "behavioral_cluster": int(row.get("cluster_id", -1)),
                     # Demographic attributes ride along for L5 breakdowns.
                     "age_group": str(row.get("age_group", "")),
@@ -246,12 +246,12 @@ class SimulatedGenerationEngine(GenerationEngine):
                         f"{row.get('age_group', '')} | "
                         f"{row.get('income_group', '')} | {row.get('region', '')}"
                     ),
-                    "parse_method": "simulated",
+                    "parse_method": "demo",
                 })
 
         logger.info(
             "generation_complete",
-            strategy="simulated",
+            strategy="demo",
             model=model,
             responses=len(responses),
             duration_ms=round((time.perf_counter() - started) * 1000, 1),

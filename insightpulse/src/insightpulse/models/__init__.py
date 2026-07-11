@@ -30,6 +30,7 @@ from insightpulse.models.panelist import (
     PurchaseRecord,
 )
 from insightpulse.models.survey import (
+    SurveyMetadata,
     SurveyQuestion,
     SurveyResponse,
     SurveyResult,
@@ -47,6 +48,7 @@ __all__ = [
     "Household",
     "Panelist",
     "PurchaseRecord",
+    "SurveyMetadata",
     "SurveyPipelineState",
     "SurveyQuestion",
     "SurveyResponse",

@@ -57,7 +57,9 @@ export function Header() {
             {env === "production" ? "Live" : "Demo"}
           </Badge>
         ) : (
-          <Badge variant="outline">API offline</Badge>
+          <Badge variant="outline" className="border-niq-navy text-niq-navy">
+            Local Mode
+          </Badge>
         )}
         {user && (
           <span className="rounded-full border border-niq-border bg-niq-bg px-3 py-1 text-xs font-semibold text-niq-navy">

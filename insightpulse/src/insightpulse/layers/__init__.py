@@ -11,7 +11,7 @@ Architectural role
     ========== ============================ ================================
     L1 data    CSVRepository                SQLRepository (CSV fallback)
     L2 embed   PrecomputedEmbeddingEngine   TransformerEmbeddingEngine
-    L3 twins   SimulatedGenerationEngine    LLMGenerationEngine
+    L3 twins   DemoGenerationEngine    LLMGenerationEngine
     L4 BDCL    SimpleCalibrationEngine      SinkhornCalibrationEngine
     L5 insight BasicInsightEngine           FullInsightEngine
     ========== ============================ ================================
@@ -42,9 +42,9 @@ from insightpulse.layers.embedding_layer import (
     TransformerEmbeddingEngine,
 )
 from insightpulse.layers.generative_layer import (
+    DemoGenerationEngine,
     GenerationEngine,
     LLMGenerationEngine,
-    SimulatedGenerationEngine,
 )
 from insightpulse.layers.insight_layer import (
     BasicInsightEngine,
@@ -123,7 +123,7 @@ def get_generation_engine(env: Environment | None = None) -> GenerationEngine:
     """
     if _is_production(env):
         return LLMGenerationEngine()
-    return SimulatedGenerationEngine()
+    return DemoGenerationEngine()
 
 
 def get_calibration_engine(env: Environment | None = None) -> CalibrationEngine:

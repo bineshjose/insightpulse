@@ -11,7 +11,7 @@ strongest on the local model — so the calibration layer does a different
 amount of transport work per model. Calibration parameters are therefore
 re-fit per model, never shared.
 
-By default responses come from the offline simulation engine (reproducible,
+By default responses come from the offline demo engine (reproducible,
 no API keys). Pass ``--live`` to route real LLM calls through the LangGraph
 pipeline instead (requires API keys / a running Ollama server).
 
@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from experiments.common import PALETTE, save_figure, save_results, setup_experiment
-from insightpulse import simulation
+from insightpulse import demo_engine
 
 # The three models under comparison (evaluator feedback #1).
 MODELS = ["claude-sonnet-4-6", "gpt-4o", "ollama/llama3.1"]
@@ -43,8 +43,8 @@ DEFAULT_COHORT_SIZE = 300
 DEFAULT_SEED = 42
 
 
-def run_simulated(cohort_size: int, seed: int) -> list[dict[str, Any]]:
-    """Run the survey across all models via the offline simulation engine.
+def run_demo(cohort_size: int, seed: int) -> list[dict[str, Any]]:
+    """Run the survey across all models via the offline demo engine.
 
     Args:
         cohort_size: Number of panelist households per run.
@@ -53,18 +53,18 @@ def run_simulated(cohort_size: int, seed: int) -> list[dict[str, Any]]:
     Returns:
         One summary dict per model.
     """
-    catalog = simulation.question_catalog()
-    panelists = simulation.load_panelists()
+    catalog = demo_engine.question_catalog()
+    panelists = demo_engine.load_panelists()
     cohort = panelists.sample(n=cohort_size, random_state=seed)
 
     summaries = []
     for model in MODELS:
-        run = simulation.simulate_survey_run(catalog, cohort, model, seed=seed)
+        run = demo_engine.run_survey(catalog, cohort, model, seed=seed)
         raw = [r["metrics_raw"] for r in run["question_results"]]
         cal = [r["metrics_calibrated"] for r in run["question_results"]]
         summaries.append({
             "model": model,
-            "mode": "simulation",
+            "mode": "demo",
             "js_divergence_raw": float(np.mean([x["js_divergence"] for x in raw])),
             "js_divergence_calibrated": float(np.mean([x["js_divergence"] for x in cal])),
             "wasserstein_raw": float(np.mean([x["wasserstein_distance"] for x in raw])),
@@ -96,7 +96,7 @@ async def run_live(cohort_size: int, seed: int) -> list[dict[str, Any]]:
     """
     from insightpulse.agents.orchestrator import run_survey
 
-    catalog = simulation.question_catalog()
+    catalog = demo_engine.question_catalog()
     questions = [q["text"] for q in catalog]
 
     summaries = []
@@ -208,14 +208,14 @@ def main() -> dict[str, Any]:
 
     logger.info(
         "multi_llm_comparison_start",
-        models=MODELS, mode="live" if args.live else "simulation",
+        models=MODELS, mode="live" if args.live else "demo",
         cohort_size=args.cohort_size, seed=args.seed,
     )
 
     if args.live:
         summaries = asyncio.run(run_live(args.cohort_size, args.seed))
     else:
-        summaries = run_simulated(args.cohort_size, args.seed)
+        summaries = run_demo(args.cohort_size, args.seed)
 
     usable = [s for s in summaries if "error" not in s]
     for failed in (s for s in summaries if "error" in s):

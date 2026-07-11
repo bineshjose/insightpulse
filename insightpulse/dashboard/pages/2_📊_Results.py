@@ -1,9 +1,4 @@
-"""Results — distributions, evaluation metrics, and demographic breakdowns.
-
-Shows raw vs. calibrated vs. empirical distributions per question, the full
-metric suite from insightpulse.utils.metrics, and cohort breakdowns by any
-demographic dimension. Every chart has a table-view twin (expander).
-"""
+"""Results — distributions, evaluation metrics, and demographic breakdowns."""
 
 import sys
 from pathlib import Path
@@ -13,7 +8,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, data_loader, simulation, theme
+from components import auth, data_loader, theme
 from components.charts import CATEGORICAL, PLOTLY_CONFIG, distribution_chart
 
 user = auth.require_page("results")
@@ -24,34 +19,53 @@ theme.page_header(
     "Results",
 )
 
-run = simulation.get_last_run()
-if run is None:
-    st.info(
-        "No results yet — run a survey to get started, or generate a demo run below.",
-        icon="✨",
-    )
-    if data_loader.data_available() and st.button("Generate a demo run"):
-        catalog = data_loader.question_catalog()
-        panelists = data_loader.load_panelists()
-        demo = simulation.simulate_survey_run(
-            catalog[:3],
-            panelists.sample(n=100, random_state=42),
-            "claude-sonnet-4-6",
-            seed=42,
-        )
-        simulation.store_run(demo)
-        st.rerun()
+history = st.session_state.get("run_history", [])
+if not history:
+    st.info("No results yet — run a survey to get started.", icon="✨")
+    can_run = data_loader.data_available() and auth.has_permission(user, "run")
+    if can_run and st.button("Run a survey now", type="primary"):
+        st.switch_page("pages/1_🎯_Survey_Runner.py")
     theme.footer()
     st.stop()
 
+
+def _run_option_label(run: dict) -> str:
+    """Run selector label: 'Organic Labeling · Jul 11, 2026 · 250 respondents'."""
+    meta = run.get("metadata") or {}
+    name = meta.get("survey_name") or theme.run_label(run["run_id"])
+    created = theme.format_timestamp(run["created_at"]).split(" · ")[0]
+    return f"{name} · {created} · {run['config']['cohort_size']} respondents"
+
+
+runs_newest_first = list(reversed(history))
+selected_label = st.selectbox(
+    "Survey run", [_run_option_label(r) for r in runs_newest_first],
+    label_visibility="collapsed",
+)
+run = runs_newest_first[
+    [_run_option_label(r) for r in runs_newest_first].index(selected_label)
+]
+
 totals = run["totals"]
 config = run["config"]
+meta = run.get("metadata") or {}
 
+if meta.get("survey_name"):
+    st.markdown(
+        f'<div style="font-size:1.05rem; font-weight:700; color:{theme.NAVY};">'
+        f'{meta["survey_name"]}'
+        f'<span style="color:{theme.TEXT_SECONDARY}; font-weight:500; font-size:0.9rem;">'
+        f' &nbsp;|&nbsp; Client: {meta.get("client_name", "—")}'
+        f' &nbsp;|&nbsp; Contract: {meta.get("contract_id", "—")}'
+        f' &nbsp;|&nbsp; {meta.get("category", "—")}</span></div>',
+        unsafe_allow_html=True,
+    )
+display_id = meta.get("survey_id") or theme.run_label(run["run_id"])
 st.markdown(
     f'<p style="color:{theme.TEXT_SECONDARY}; font-size:0.85rem;">'
-    f'<span title="Full run ID: {run["run_id"]}"><b>{theme.run_label(run["run_id"])}</b></span>'
+    f'<span title="Run {run["run_id"]}"><b>{display_id}</b></span>'
     f" &nbsp;·&nbsp; {config['model']} &nbsp;·&nbsp; cohort {config['cohort_size']}"
-    f" &nbsp;·&nbsp; seed {config['seed']} &nbsp;·&nbsp; calibration "
+    f" &nbsp;·&nbsp; calibration "
     f"{'on' if config['calibration_applied'] else 'off'}"
     f" &nbsp;·&nbsp; {theme.format_timestamp(run['created_at'])}</p>",
     unsafe_allow_html=True,
@@ -183,7 +197,7 @@ for group in groups:
     subset = q_responses[q_responses[dimension] == group]
     counts = subset["answer"].value_counts()
     total = max(len(subset), 1)
-    breakdown_series[str(group)] = [
+    breakdown_series[str(group).replace("_", " ").title()] = [
         100 * counts.get(opt, 0) / total for opt in selected["options"]
     ]
 
@@ -209,25 +223,27 @@ st.subheader("Export")
 if auth.has_permission(user, "export"):
     import json as _json
 
+    export_id = meta.get("survey_id") or run["run_id"]
     csv_bytes = responses.drop(columns=["validation_flags"]).to_csv(index=False).encode()
     export_col1, export_col2 = st.columns(2)
     with export_col1:
         if st.download_button(
             "⬇️ Download responses (CSV)",
             data=csv_bytes,
-            file_name=f"insightpulse_run_{run['run_id']}.csv",
+            file_name=f"insightpulse_{export_id}.csv",
             mime="text/csv",
         ):
-            auth.record_activity("Exported results", f"Run {run['run_id']} — CSV")
+            auth.record_activity("Exported results", f"{export_id} — CSV")
     with export_col2:
-        results_json = _json.dumps(run["question_results"], indent=2, default=str)
+        export_payload = {"metadata": meta, "question_results": run["question_results"]}
+        results_json = _json.dumps(export_payload, indent=2, default=str)
         if st.download_button(
             "⬇️ Download metrics (JSON)",
             data=results_json,
-            file_name=f"insightpulse_run_{run['run_id']}_metrics.json",
+            file_name=f"insightpulse_{export_id}_metrics.json",
             mime="application/json",
         ):
-            auth.record_activity("Exported results", f"Run {run['run_id']} — JSON")
+            auth.record_activity("Exported results", f"{export_id} — JSON")
 else:
     st.info(
         f"Export requires the 'export' capability — not included in the "

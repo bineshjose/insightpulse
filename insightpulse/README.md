@@ -65,7 +65,7 @@ pip install -e ".[dev]"
 # 2. Generate the synthetic sample panel (500 households, 10K purchases)
 make generate-data
 
-# 3. Launch the dashboard — local simulation mode runs the full pipeline offline
+# 3. Launch the dashboard — Demo Mode runs the full pipeline offline
 streamlit run dashboard/app.py
 ```
 
@@ -90,13 +90,13 @@ Both frontends are auth-gated with the same demo accounts:
 
 Real LLM generation routes through LiteLLM (Claude, OpenAI, Ollama). Without API
 keys, every dashboard page and experiment still works through the built-in
-simulation engine, which reproduces each model's documented bias profile.
+demo engine, which reproduces each model's documented bias profile.
 
 ## Dashboard
 
 Five pages under `dashboard/pages/`:
 
-1. **🎯 Survey Runner** — question bank, cohort filters (age/income/region/archetype), model + seed + calibration config; local simulation or API pipeline execution
+1. **🎯 Survey Runner** — survey setup (client, contract, category, priority), question bank, cohort filters (age/income/region/archetype), model + calibration config; Demo Mode or Production Mode execution
 2. **📊 Results** — raw vs. calibrated vs. empirical distributions, full metric suite, demographic breakdowns, CSV export
 3. **🧪 Experiments** — multi-LLM comparison, Sinkhorn convergence, drift monitoring, sequential-dependency analysis
 4. **✅ Validation** — cross-validation against empirical ground truth with pass/fail verdicts and metric justifications
@@ -139,7 +139,7 @@ insightpulse/
 │   ├── models/            # Pydantic v2 data models (panelists, surveys, embeddings)
 │   ├── config/            # Settings with demo/production/test profiles
 │   ├── utils/             # Evaluation metrics + structlog configuration
-│   └── simulation.py      # Offline twin-simulation engine (shared by dashboard + experiments)
+│   └── demo_engine.py     # Offline twin demo engine (shared by dashboard + experiments)
 ├── dashboard/             # Streamlit app (5 pages + shared components)
 ├── experiments/           # 4 reproducible experiments + shared figure style
 ├── data/synthetic/        # Sample data generator (+ generated CSVs, git-ignored)

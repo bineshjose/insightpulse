@@ -44,10 +44,10 @@ from insightpulse.layers.embedding_layer import (
 )
 from insightpulse.layers.generative_layer import (
     CircuitBreaker,
+    DemoGenerationEngine,
     LLMGenerationEngine,
     PersonaPromptBuilder,
     ResponseParser,
-    SimulatedGenerationEngine,
 )
 from insightpulse.layers.insight_layer import (
     BasicInsightEngine,
@@ -504,21 +504,21 @@ class TestPersonaPromptBuilder:
         assert "Very important" in user
 
 
-class TestSimulatedGenerationEngine:
+class TestDemoGenerationEngine:
     async def test_deterministic_for_same_seed(self, cohort):
-        engine = SimulatedGenerationEngine()
+        engine = DemoGenerationEngine()
         first = await engine.generate_responses([QUESTION], cohort, "gpt-4o", seed=7)
         second = await engine.generate_responses([QUESTION], cohort, "gpt-4o", seed=7)
         assert [r["answer"] for r in first] == [r["answer"] for r in second]
 
     async def test_unknown_model_raises(self, cohort):
-        with pytest.raises(GenerationError, match="No simulation profile"):
-            await SimulatedGenerationEngine().generate_responses(
+        with pytest.raises(GenerationError, match="No demo profile"):
+            await DemoGenerationEngine().generate_responses(
                 [QUESTION], cohort, "made-up-model"
             )
 
     async def test_answers_come_from_options(self, cohort):
-        responses = await SimulatedGenerationEngine().generate_responses(
+        responses = await DemoGenerationEngine().generate_responses(
             [QUESTION], cohort, "claude-sonnet-4-6"
         )
         assert len(responses) == len(cohort)

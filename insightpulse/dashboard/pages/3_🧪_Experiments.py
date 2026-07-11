@@ -1,12 +1,4 @@
-"""Experiments — multi-LLM comparison, calibration convergence, drift, sequence.
-
-Covers the four standing experiment tracks:
-- Multi-LLM comparison: same survey run across every routed model.
-- Retraining pipeline: rolling drift detection with an explicit trigger.
-- Sequential question dependency: consistency with/without prior-answer
-  conditioning.
-- BDCL calibration convergence across regularization strengths.
-"""
+"""Experiments — multi-LLM comparison, calibration convergence, drift, sequence."""
 
 import sys
 from pathlib import Path
@@ -17,7 +9,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, data_loader, simulation, theme
+from components import auth, data_loader, demo_engine, theme
 from components.charts import (
     MODEL_COLORS,
     PLOTLY_CONFIG,
@@ -49,11 +41,7 @@ catalog = data_loader.question_catalog()
 # ---------------------------------------------------------------------------
 
 st.header("1 · Multi-LLM comparison")
-st.markdown(
-    "The same survey (identical questions, cohort, and seed) executed across "
-    "every model in the LiteLLM router, isolating model choice as the only "
-    "variable."
-)
+st.markdown("Identical survey, cohort, and seed — executed across every routed model.")
 
 llm_cohort_size = st.slider("Cohort size", 50, 500, 200, 50, key="llm_cohort")
 with st.expander("⚙ Advanced settings"):
@@ -62,14 +50,14 @@ with st.expander("⚙ Advanced settings"):
         help="Fixes the sampling so the comparison can be reproduced exactly.",
     )
 
-if st.button("▶ Run comparison", key="run_llm"):
+if st.button("▶ Run comparison", key="run_llm", type="primary"):
     cohort = panelists.sample(n=llm_cohort_size, random_state=int(llm_seed))
     rows = []
-    models = list(simulation.MODEL_PROFILES)
+    models = list(demo_engine.MODEL_PROFILES)
     with st.spinner("Running the survey across all models..."):
         progress = st.progress(0.0)
         for i, model in enumerate(models):
-            run = simulation.simulate_survey_run(
+            run = demo_engine.run_survey(
                 catalog, cohort, model, seed=int(llm_seed), calibrate=True
             )
             met = pd.DataFrame([r["metrics_calibrated"] for r in run["question_results"]])
@@ -86,7 +74,7 @@ if st.button("▶ Run comparison", key="run_llm"):
         progress.empty()
     st.session_state["llm_comparison"] = pd.DataFrame(rows)
     auth.record_activity(
-        "Ran experiment", f"Multi-LLM Comparison ({len(models)} models, seed {llm_seed})"
+        "Ran experiment", f"Multi-LLM Comparison ({len(models)} models)"
     )
 
 if "llm_comparison" in st.session_state:
@@ -125,13 +113,6 @@ if "llm_comparison" in st.session_state:
             }),
             use_container_width=True, hide_index=True,
         )
-    st.caption(
-        "Calibration parameters are re-fit per model: each model's "
-        "mode-collapse severity changes the Sinkhorn transport plan, so "
-        "BDCL weights are model-specific, never shared."
-    )
-else:
-    st.info("Press **Run comparison** to execute the survey across all models.")
 
 st.divider()
 
@@ -140,11 +121,6 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.header("2 · BDCL calibration convergence")
-st.markdown(
-    "Sinkhorn iterations vs. residual JS divergence for different entropic "
-    "regularization strengths ε. Smaller ε converges slower but reaches a "
-    "tighter alignment."
-)
 
 EPSILONS = [0.01, 0.05, 0.1, 0.5]
 ITERATIONS = 200
@@ -171,10 +147,6 @@ st.plotly_chart(convergence_chart(
     convergence, "iteration", "js", "epsilon",
     "Residual JS divergence by Sinkhorn iteration", "JS divergence", log_y=True,
 ), use_container_width=True, config=PLOTLY_CONFIG)
-st.caption(
-    "Production setting: ε = 0.1 (converges in ≈80 iterations to JS ≈ 0.017, "
-    "matching the thesis result) — the best fidelity/runtime trade-off."
-)
 
 st.divider()
 
@@ -183,12 +155,6 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.header("3 · Behavioral drift & retraining triggers")
-st.markdown(
-    "Monthly category-mix distributions from the purchase data, compared "
-    "against a 3-month baseline window via JS divergence. When drift exceeds "
-    "the trigger for two consecutive months, the retraining pipeline "
-    "re-embeds the panel and re-fits the calibration layer."
-)
 
 DRIFT_TRIGGER = 0.010
 
@@ -214,7 +180,7 @@ st.plotly_chart(drift_chart(
     "Category-mix drift vs. 3-month baseline", "JS divergence",
 ), use_container_width=True, config=PLOTLY_CONFIG)
 
-with st.expander("Retraining pipeline definition"):
+with st.expander("Retraining policy"):
     st.markdown(f"""
 | Component | Definition |
 |---|---|
@@ -232,11 +198,6 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.header("4 · Sequential question dependency")
-st.markdown(
-    "Multi-question surveys are generated with prior answers injected into "
-    "the twin's context. Removing that conditioning breaks cross-question "
-    "logical consistency."
-)
 
 seq = pd.DataFrame({
     "conditioning": ["With prior-answer context", "Independent generation"],
@@ -255,11 +216,6 @@ with col2:
         "Consistency gain", "+13.4 pp",
         "percentage points, from sequential conditioning",
         delta_color="off",
-    )
-    st.caption(
-        "Example: a twin answering “Rarely” to purchase frequency no longer "
-        "reports being “Extremely” affected by snack promotions. Prior "
-        "answers are threaded through SurveyQuestion.prior_questions."
     )
 
 theme.footer()

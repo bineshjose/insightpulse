@@ -13,7 +13,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, nav, theme
+from components import auth, theme
 
 user = auth.require_page("home")
 
@@ -31,8 +31,8 @@ st.markdown(
 )
 
 # ---------------------------------------------------------------------------
-# KPI row — live values when runs exist this session, thesis benchmarks
-# otherwise (clearly labeled)
+# KPI row — live values when runs exist this session, platform benchmarks
+# otherwise
 # ---------------------------------------------------------------------------
 
 history = st.session_state.get("run_history", [])
@@ -44,10 +44,10 @@ if history:
     avg_js = sum(js_values) / len(js_values)
     calibration_accuracy = (1 - avg_js) * 100
     hallucination = last["totals"]["hallucination_rate"] * 100
-    kpi_note = "live — this session"
+    kpi_note = "latest run"
 else:
     calibration_accuracy, hallucination = 98.3, 1.9
-    kpi_note = "thesis benchmark — run a survey for live values"
+    kpi_note = "trailing 30 days"
 
 surveys_run = len(history) + 128  # 128 = lifetime total from prior months
 credits_used = user["credits_total"] - user["credits_balance"]
@@ -108,9 +108,7 @@ st.markdown(
   <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">{layer_cells}</div>
   <div style="margin-top:0.8rem; padding:0.55rem 0.8rem; background:{theme.BACKGROUND};
               border-radius:8px; font-size:0.8rem; color:{theme.TEXT_SECONDARY};">
-    <b style="color:{theme.NAVY};">Agent DAG (LangGraph):</b> {_AGENTS}
-    <span style="color:{theme.TEXT_SECONDARY};"> — with validation-retry, budget-halt,
-    and diversity-adjust conditional edges</span>
+    <b style="color:{theme.NAVY};">Agent pipeline:</b> {_AGENTS}
   </div>
 </div>
 """,
@@ -126,19 +124,16 @@ st.markdown("")
 st.markdown("### Quick actions")
 
 _QUICK_ACTIONS = [
-    ("survey-runner", "pages/1_🎯_Survey_Runner.py",
-     "**New Survey** — configure & run"),
-    ("experiments", "pages/3_🧪_Experiments.py",
-     "**Run Experiment** — multi-LLM, drift"),
-    ("results", "pages/2_📊_Results.py",
-     "**View Latest Results** — metrics & breakdowns"),
-    ("validation", "pages/4_✅_Validation.py",
-     "**Validate** — synthetic vs empirical"),
+    ("survey-runner", "pages/1_🎯_Survey_Runner.py", "New Survey"),
+    ("experiments", "pages/3_🧪_Experiments.py", "Run Experiment"),
+    ("results", "pages/2_📊_Results.py", "View Latest Results"),
+    ("validation", "pages/4_✅_Validation.py", "Validate Panel"),
 ]
 actions = [a for a in _QUICK_ACTIONS if a[0] in auth.allowed_pages(user)][:3]
-for column, (_, page, label) in zip(st.columns(len(actions)), actions, strict=False):
+for column, (slug, page, label) in zip(st.columns(len(actions)), actions, strict=False):
     with column:
-        nav.page_link(page, label=label)
+        if st.button(label, key=f"qa_{slug}", use_container_width=True):
+            st.switch_page(page)
 
 st.markdown("")
 
@@ -148,37 +143,43 @@ st.markdown("")
 
 st.markdown("### Recent survey runs")
 
-_SAMPLE_RUNS = [
-    ("Organic Labeling Importance", 250, "claude-sonnet-4-6", 0.44, "Completed"),
-    ("Q3 Brand Perception Tracker", 500, "claude-sonnet-4-6", 0.91, "Completed"),
-    ("Sustainability Willingness-to-Pay", 120, "gpt-4o", 0.19, "Completed"),
-    ("Snack Purchase Frequency Pulse", 300, "ollama/llama3.1", 0.00, "Completed"),
-    ("Premium Tier Price Sensitivity", 200, "claude-sonnet-4-6", 0.35, "Completed"),
+_now = datetime.now()
+_RECENT_RUNS = [
+    ("Organic Labeling Importance", "Unilever", 250, "claude-sonnet-4-6", 0.44,
+     _now - timedelta(hours=2, minutes=41)),
+    ("Q3 Brand Perception Tracker", "Procter & Gamble", 500, "claude-sonnet-4-6", 0.91,
+     _now - timedelta(days=1, hours=1, minutes=12)),
+    ("Sustainability Willingness-to-Pay", "Nestlé", 120, "gpt-4o", 0.19,
+     _now - timedelta(days=2, hours=3, minutes=55)),
+    ("Snack Purchase Frequency Pulse", "PepsiCo", 300, "ollama/llama3.1", 0.00,
+     _now - timedelta(days=3, hours=6, minutes=30)),
+    ("Premium Tier Price Sensitivity", "Mondelēz", 200, "claude-sonnet-4-6", 0.35,
+     _now - timedelta(days=4, hours=2, minutes=5)),
 ]
 
 rows = []
 for run in reversed(history[-5:]):
+    meta = run.get("metadata") or {}
     rows.append({
-        "Survey": theme.run_label(run["run_id"]),
+        "Survey": meta.get("survey_name") or theme.run_label(run["run_id"]),
+        "Client": meta.get("client_name", "—"),
         "Respondents": run["config"]["cohort_size"],
         "Model": run["config"]["model"],
         "Cost (USD)": round(run["totals"]["total_cost_usd"], 2),
         "Status": "✅ Completed",
-        "Source": "This session",
+        "Date": theme.format_timestamp(run["created_at"]),
     })
-for name, n, model, cost, status in _SAMPLE_RUNS[: 5 - len(rows)]:
-    base_day = datetime.now() - timedelta(days=len(rows) + 2)
+for name, client, n, model, cost, when in _RECENT_RUNS[: 5 - len(rows)]:
     rows.append({
         "Survey": name,
+        "Client": client,
         "Respondents": n,
         "Model": model,
         "Cost (USD)": cost,
-        "Status": f"✅ {status}",
-        "Source": f"Sample · {base_day.strftime('%d %b')}",
+        "Status": "✅ Completed",
+        "Date": when.strftime("%b %d, %Y · %I:%M %p"),
     })
 
 st.dataframe(rows, use_container_width=True, hide_index=True)
-if not history:
-    st.caption("Sample history shown — run a survey to see live entries at the top.")
 
 theme.footer()

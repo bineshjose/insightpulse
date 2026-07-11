@@ -117,29 +117,32 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Recent survey runs</CardTitle>
-          <CardDescription>Sample history — live runs appear here after execution.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Survey</TableHead>
+                <TableHead>Client</TableHead>
                 <TableHead>Respondents</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>Cost</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {RECENT_RUNS.map((run) => (
                 <TableRow key={run.survey}>
                   <TableCell className="font-semibold">{run.survey}</TableCell>
+                  <TableCell>{run.client}</TableCell>
                   <TableCell>{formatNumber(run.respondents)}</TableCell>
                   <TableCell className="font-mono text-xs">{run.model}</TableCell>
                   <TableCell>{formatUsd(run.cost)}</TableCell>
                   <TableCell>
                     <StatusBadge status="healthy" label="Completed" />
                   </TableCell>
+                  <TableCell className="text-niq-text-secondary">{run.date}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -27,8 +27,8 @@ from insightpulse.layers.embedding_layer import (
     TransformerEmbeddingEngine,
 )
 from insightpulse.layers.generative_layer import (
+    DemoGenerationEngine,
     LLMGenerationEngine,
-    SimulatedGenerationEngine,
 )
 from insightpulse.layers.insight_layer import BasicInsightEngine, FullInsightEngine
 
@@ -40,7 +40,7 @@ class TestFactoryEnvironmentMapping:
     def test_demo_and_test_use_lightweight_strategies(self, env):
         assert isinstance(get_data_repository(env), CSVRepository)
         assert isinstance(get_embedding_engine(env), PrecomputedEmbeddingEngine)
-        assert isinstance(get_generation_engine(env), SimulatedGenerationEngine)
+        assert isinstance(get_generation_engine(env), DemoGenerationEngine)
         assert isinstance(get_calibration_engine(env), SimpleCalibrationEngine)
         assert isinstance(get_insight_engine(env), BasicInsightEngine)
 
@@ -57,7 +57,7 @@ class TestFactoryEnvironmentMapping:
         # strategies, and importing the factories must never require an
         # LLM key, database, or GPU.
         assert isinstance(get_data_repository(), CSVRepository)
-        assert isinstance(get_generation_engine(), SimulatedGenerationEngine)
+        assert isinstance(get_generation_engine(), DemoGenerationEngine)
 
     def test_production_sql_repository_has_csv_fallback(self):
         repository = get_data_repository(Environment.PRODUCTION)

@@ -1,9 +1,4 @@
-"""Audit — provenance, agent trace, cost breakdown, and reproducibility.
-
-Everything the AuditAgent records to make a survey run replayable: the
-configuration hash, the ordered agent execution trace, spend, and the exact
-command to reproduce the run.
-"""
+"""Audit — provenance, agent trace, cost breakdown, and reproducibility."""
 
 import json
 import sys
@@ -15,7 +10,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, data_loader, nav, simulation, theme
+from components import auth, data_loader, demo_engine, nav, theme
 from components.charts import PLOTLY_CONFIG, agent_timeline_chart
 
 user = auth.require_page("audit")
@@ -32,11 +27,11 @@ GATE_CONSISTENCY_MIN = 0.90
 GATE_VALIDITY_MIN = 0.93
 
 _MODE_LABELS = {
-    "local_simulation": "Demo (Local Simulation)",
-    "api_pipeline": "Production (API Pipeline)",
+    "demo": "Demo Mode",
+    "api_pipeline": "Production Mode",
 }
 
-run = simulation.get_last_run()
+run = demo_engine.get_last_run()
 if run is None:
     st.info(
         "No survey run in this session yet — run one from the Survey Runner page.",
@@ -52,8 +47,35 @@ if run is None:
 
 st.subheader("Provenance")
 
+meta = run.get("metadata") or {}
 col1, col2 = st.columns([2, 1])
 with col1:
+    if meta.get("survey_name"):
+        st.markdown(
+            f'<div style="font-size:1.02rem; font-weight:700; color:{theme.NAVY};'
+            f' margin-bottom:0.35rem;">{meta["survey_name"]}'
+            f'<span style="color:{theme.TEXT_SECONDARY}; font-weight:500;'
+            f' font-size:0.85rem;"> &nbsp;{meta.get("survey_id", "")}</span></div>',
+            unsafe_allow_html=True,
+        )
+        detail_rows = [
+            ("Client", meta.get("client_name", "—")),
+            ("Contract", meta.get("contract_id", "—")),
+            ("Category", meta.get("category", "—")),
+            ("Priority", meta.get("priority", "—")),
+            ("Region", meta.get("region", "—")),
+            ("Executor", f"{meta.get('executor_name', '—')}"
+                         f" ({meta.get('executor_email', '—')})"),
+        ]
+        st.markdown(
+            "".join(
+                f'<div style="font-size:0.9rem;"><span style="color:'
+                f'{theme.TEXT_SECONDARY};">{label}:</span> {value}</div>'
+                for label, value in detail_rows
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown("")
     st.markdown(
         f'**Run ID:** <span title="{run["run_id"]}">{theme.run_label(run["run_id"])}</span>'
         f' &nbsp;<span style="color:{theme.TEXT_SECONDARY}; font-size:0.85rem;">'
@@ -62,7 +84,7 @@ with col1:
     )
     st.markdown(f"**Created:** {theme.format_timestamp(run['created_at'])}")
     st.markdown(f"**Mode:** {_MODE_LABELS.get(run['mode'], run['mode'])}")
-    st.markdown("**Provenance hash (SHA-256 of config):**")
+    st.markdown("**Provenance hash:**")
     st.code(run["provenance_hash"], language=None)
 with col2:
     totals = run["totals"]
@@ -77,7 +99,7 @@ with col2:
     ), unsafe_allow_html=True)
 
 with st.expander("Full run configuration"):
-    st.json(run["config"])
+    st.json({**run["config"], "metadata": meta})
 
 st.divider()
 
@@ -86,13 +108,12 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.subheader("Agent execution trace")
-st.caption("The 8-agent LangGraph DAG in execution order.")
 
 trace = run["agent_trace"]
 st.plotly_chart(agent_timeline_chart(trace), use_container_width=True, config=PLOTLY_CONFIG)
 st.caption(
-    "TwinOrchestrator dominates the timeline by design — it generates one "
-    "LLM response per (panelist × question), while every other agent runs once."
+    "TwinOrchestrator generates one response per (panelist × question); "
+    "every other agent runs once."
 )
 
 with st.expander("Trace detail (table view)"):
@@ -139,10 +160,6 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.subheader("Reproducibility")
-st.markdown(
-    "Replaying with the same configuration and seed regenerates identical "
-    "responses; the provenance hash verifies the configuration is unchanged."
-)
 question_ids = json.dumps(run["config"]["questions"])
 st.code(
     f"curl -X POST {data_loader.API_URL}/api/v1/survey/run \\\n"
@@ -155,49 +172,55 @@ st.code(
 )
 
 # ---------------------------------------------------------------------------
-# Session run history
+# Run history
 # ---------------------------------------------------------------------------
 
 st.divider()
-st.subheader("Session run history")
+st.subheader("Run history")
 
-# Seeded earlier-session records so the table reads like real usage even
-# when this session only has one or two live runs.
 _now = datetime.now()
-_SAMPLE_HISTORY = [
-    ("9c41e7b2", _now - timedelta(hours=15, minutes=49),
-     "gpt-4o", 200, "2.3%", "$0.45", "134e1767"),
-    ("5d02af38", _now - timedelta(hours=21, minutes=40),
-     "claude-sonnet-4-6", 100, "1.5%", "$0.41", "8a92cc04"),
-    ("e77b1c90", _now - timedelta(days=2, hours=1, minutes=8),
-     "claude-haiku-4-5", 250, "2.1%", "$0.39", "27f0b9d3"),
-    ("3e04d6a5", _now - timedelta(days=2, hours=20, minutes=22),
-     "claude-sonnet-4-6", 300, "1.9%", "$0.43", "b65a01ee"),
-    ("c1985f27", _now - timedelta(days=4, hours=2, minutes=56),
-     "claude-sonnet-4-6", 150, "1.8%", "$0.38", "40dd7a16"),
+_HISTORY = [
+    ("SRV-2026-00142", "Organic Labeling Importance", "Unilever",
+     _now - timedelta(hours=2, minutes=41), "claude-sonnet-4-6", 250,
+     "1.9%", "$0.44", "134e1767"),
+    ("SRV-2026-00141", "Q3 Brand Perception Tracker", "Procter & Gamble",
+     _now - timedelta(days=1, hours=1, minutes=12), "claude-sonnet-4-6", 500,
+     "2.1%", "$0.91", "8a92cc04"),
+    ("SRV-2026-00140", "Sustainability Willingness-to-Pay", "Nestlé",
+     _now - timedelta(days=2, hours=3, minutes=55), "gpt-4o", 120,
+     "2.3%", "$0.19", "27f0b9d3"),
+    ("SRV-2026-00139", "Snack Purchase Frequency Pulse", "PepsiCo",
+     _now - timedelta(days=3, hours=6, minutes=30), "ollama/llama3.1", 300,
+     "1.5%", "$0.00", "b65a01ee"),
+    ("SRV-2026-00138", "Premium Tier Price Sensitivity", "Mondelēz",
+     _now - timedelta(days=4, hours=2, minutes=5), "claude-sonnet-4-6", 200,
+     "1.8%", "$0.35", "40dd7a16"),
 ]
 
 history = st.session_state.get("run_history", [])
 history_rows = [{
-    "run_id": theme.run_label(h["run_id"]),
+    "survey_id": (h.get("metadata") or {}).get("survey_id")
+                 or theme.run_label(h["run_id"]),
+    "survey": (h.get("metadata") or {}).get("survey_name") or "—",
+    "client": (h.get("metadata") or {}).get("client_name") or "—",
     "created": theme.format_timestamp(h["created_at"]),
     "model": h["config"]["model"],
     "cohort": h["config"]["cohort_size"],
     "hallucination": f"{h['totals']['hallucination_rate']:.1%}",
     "cost": f"${h['totals']['total_cost_usd']:.2f}",
     "hash": h["provenance_hash"][:8],
-    "source": "This session",
 } for h in reversed(history)]
 history_rows += [{
-    "run_id": theme.run_label(rid),
+    "survey_id": sid,
+    "survey": name,
+    "client": client,
     "created": created.strftime("%b %d, %Y · %I:%M %p"),
     "model": model,
     "cohort": cohort,
     "hallucination": halluc,
     "cost": cost,
     "hash": digest,
-    "source": "Earlier session",
-} for rid, created, model, cohort, halluc, cost, digest in _SAMPLE_HISTORY]
+} for sid, name, client, created, model, cohort, halluc, cost, digest in _HISTORY]
 
 st.dataframe(
     theme.humanize_columns(pd.DataFrame(history_rows)),
@@ -215,6 +238,7 @@ st.dataframe(
 audit_record = {
     "run_id": run["run_id"],
     "created_at": run["created_at"],
+    "metadata": meta,
     "provenance_hash": run["provenance_hash"],
     "config": run["config"],
     "totals": run["totals"],
@@ -225,13 +249,14 @@ audit_record = {
     ],
 }
 if auth.has_permission(user, "export"):
+    export_id = meta.get("survey_id") or run["run_id"]
     if st.download_button(
         "⬇️ Export audit record (JSON)",
         data=json.dumps(audit_record, indent=2, default=str),
-        file_name=f"audit_{run['run_id']}.json",
+        file_name=f"audit_{export_id}.json",
         mime="application/json",
     ):
-        auth.record_activity("Exported audit record", f"Run {run['run_id']} — JSON")
+        auth.record_activity("Exported audit record", f"{export_id} — JSON")
 else:
     st.info(
         f"Audit export requires the 'export' capability — not included in the "

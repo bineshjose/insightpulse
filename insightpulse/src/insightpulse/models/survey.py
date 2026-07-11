@@ -14,6 +14,88 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
+# Survey Metadata (enterprise provenance: who the survey is for and why)
+# ---------------------------------------------------------------------------
+
+CLIENTS: list[str] = [
+    "Unilever", "Procter & Gamble", "Nestlé", "PepsiCo", "Coca-Cola",
+    "Mondelēz", "Mars", "Colgate-Palmolive", "Reckitt", "Internal Research",
+]
+
+CATEGORIES: list[str] = [
+    "FMCG — Food", "FMCG — Beverages", "FMCG — Personal Care",
+    "FMCG — Household", "Consumer Electronics", "Health & Wellness",
+]
+
+PRIORITIES: list[str] = ["High", "Medium", "Low"]
+
+# Short client codes used in auto-suggested contract IDs (NIQ-UNI-2026-Q3-047).
+CLIENT_CODES: dict[str, str] = {
+    "Unilever": "UNI", "Procter & Gamble": "PG", "Nestlé": "NES",
+    "PepsiCo": "PEP", "Coca-Cola": "KO", "Mondelēz": "MDLZ", "Mars": "MARS",
+    "Colgate-Palmolive": "CL", "Reckitt": "RKT", "Internal Research": "INT",
+}
+
+
+def make_survey_id(sequence: int, year: int | None = None) -> str:
+    """Build a display survey ID, e.g. ``SRV-2026-00142``.
+
+    Args:
+        sequence: Monotonic sequence number within the year.
+        year: Calendar year (defaults to the current year).
+
+    Returns:
+        Formatted survey ID.
+    """
+    return f"SRV-{year or datetime.now().year}-{sequence:05d}"
+
+
+def suggest_contract_id(client_name: str, sequence: int, year: int | None = None) -> str:
+    """Auto-suggest a contract ID for a client, e.g. ``NIQ-UNI-2026-Q3-047``.
+
+    Args:
+        client_name: One of :data:`CLIENTS` (unknown clients get code "GEN").
+        sequence: Contract sequence number within the quarter.
+        year: Calendar year (defaults to the current year).
+
+    Returns:
+        Formatted contract ID.
+    """
+    now = datetime.now()
+    quarter = (now.month - 1) // 3 + 1
+    code = CLIENT_CODES.get(client_name, "GEN")
+    return f"NIQ-{code}-{year or now.year}-Q{quarter}-{sequence:03d}"
+
+
+class SurveyMetadata(BaseModel):
+    """Enterprise metadata attached to every survey run.
+
+    Captures who the survey is for (client, contract) and who ran it
+    (executor), so results, audits, and exports carry full business
+    provenance alongside the technical provenance hash.
+    """
+
+    survey_id: str = Field(
+        default_factory=lambda: make_survey_id(1),
+        description='Display ID, e.g. "SRV-2026-00142"',
+    )
+    survey_name: str = Field(min_length=1, description="Human-readable survey title")
+    client_name: str = Field(default="Internal Research")
+    contract_id: str = Field(
+        default="",
+        description='Commercial contract reference, e.g. "NIQ-UNI-2026-Q3-047"',
+    )
+    category: str = Field(default="FMCG — Food")
+    region: str = Field(default="", description="Auto-filled from the executor's profile")
+    priority: str = Field(default="Medium")
+    executor_name: str = Field(default="")
+    executor_email: str = Field(default="")
+    created_at: datetime = Field(default_factory=datetime.now)
+    due_date: datetime | None = Field(default=None)
+    notes: str = Field(default="")
+
+
+# ---------------------------------------------------------------------------
 # Question Types
 # ---------------------------------------------------------------------------
 
@@ -247,6 +329,12 @@ class SurveyRun(BaseModel):
 
     run_id: UUID = Field(default_factory=uuid4)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # --- Business provenance ---
+    metadata: SurveyMetadata | None = Field(
+        default=None,
+        description="Client/contract/executor metadata for this run",
+    )
 
     # --- Input ---
     questions: list[SurveyQuestion]

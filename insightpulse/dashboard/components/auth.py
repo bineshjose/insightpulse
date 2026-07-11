@@ -1,9 +1,9 @@
 """Enterprise login and role-based access for the dashboard.
 
-Demo-grade authentication: three hardcoded, realistic accounts held
+Demo-grade authentication: four hardcoded, realistic accounts held
 in-memory, session-state persistence, and a permissions model that the
 pages consult for role-based access. This is deliberately NOT a security
-boundary — the thesis demo has no user database — but the flow (gate →
+boundary — the demo deployment has no user database — but the flow (gate →
 session → role checks → logout) mirrors how the production tool would sit
 behind the ingress OAuth proxy (see docs/api.md, Operational notes).
 
@@ -235,26 +235,26 @@ def _seed_activity() -> list[dict[str, str]]:
     base = datetime.now()
     entries = [
         (timedelta(hours=2, minutes=41),
-         "Ran survey", "Organic Labeling Importance (100 respondents, claude-sonnet-4-6)"),
-        (timedelta(hours=3, minutes=15),
-         "Ran experiment", "Multi-LLM Comparison (4 models, seed 42)"),
-        (timedelta(hours=8, minutes=48),
+         "Ran survey", "Organic Labeling Importance (250 respondents, claude-sonnet-4-6)"),
+        (timedelta(hours=3, minutes=58),
+         "Ran experiment", "Multi-LLM Comparison (4 models)"),
+        (timedelta(days=1, hours=1, minutes=12),
          "Exported results", "Q3 Brand Perception Tracker — CSV"),
-        (timedelta(hours=11, minutes=29),
+        (timedelta(days=1, hours=3, minutes=47),
          "Ran survey", "Price Sensitivity Pulse (200 respondents, gpt-4o)"),
-        (timedelta(hours=17, minutes=20),
-         "Viewed validation", "Cross-validation vs empirical response bank"),
-        (timedelta(days=1, hours=4, minutes=52),
-         "Reviewed audit trail", "Run #3E04 — provenance and quality gates"),
-        (timedelta(days=1, hours=9, minutes=7),
+        (timedelta(days=2, hours=0, minutes=25),
          "Updated calibration settings", "Sinkhorn ε 0.05 → 0.1 for production preset"),
-        (timedelta(days=1, hours=13, minutes=33),
+        (timedelta(days=2, hours=3, minutes=55),
+         "Ran survey", "Sustainability Willingness-to-Pay (120 respondents)"),
+        (timedelta(days=3, hours=6, minutes=30),
+         "Reviewed audit trail", "SRV-2026-00138 — provenance and quality gates"),
+        (timedelta(days=4, hours=2, minutes=5),
+         "Ran survey", "Premium Tier Price Sensitivity (200 respondents)"),
+        (timedelta(days=6, hours=4, minutes=18),
          "Generated drift report", "Category-mix drift vs 3-month baseline"),
-        (timedelta(days=2, hours=6, minutes=18),
+        (timedelta(days=8, hours=1, minutes=36),
          "Adjusted cohort filters", "APAC region · Premium Loyalist archetype"),
-        (timedelta(days=2, hours=10, minutes=55),
-         "Ran survey", "Sustainability Willingness-to-Pay (120 respondents, claude-haiku-4-5)"),
-        (timedelta(days=3, hours=2, minutes=44),
+        (timedelta(days=11, hours=5, minutes=49),
          "Updated settings", "Default model → claude-sonnet-4-6"),
     ]
     return [
@@ -300,6 +300,8 @@ div[data-testid="stForm"] {{
 }}
 /* No "Press Enter to submit form" hints on the credential fields. */
 .stTextInput div[data-testid="InputInstructions"] {{ display: none; }}
+/* One eye icon only: suppress the browser-native password reveal. */
+input::-ms-reveal, input::-ms-clear {{ display: none; }}
 .login-tagline {{
     color: rgba(255,255,255,0.85);
     text-align: center;
@@ -358,7 +360,7 @@ div[data-testid="stForm"] {{
 
         st.markdown(
             '<div class="login-attribution">IIT Madras &nbsp;×&nbsp; NielsenIQ<br/>'
-            "M.Tech Industrial AI Thesis — Binesh Jose (CH24M521)</div>",
+            "M.Tech Industrial AI Project — Binesh Jose (CH24M521)</div>",
             unsafe_allow_html=True,
         )
 
@@ -497,8 +499,8 @@ def render_sidebar(user: dict[str, Any]) -> None:
         env_label = "Demo Mode" if env == "demo" else "Live Mode"
         api_url = os.getenv("API_URL", "http://localhost:8000")
         api_ok = _api_healthy(api_url)
-        api_dot = "🟢" if api_ok else "⚪"
-        api_label = "Healthy" if api_ok else "Offline (local simulation)"
+        api_dot = "🟢" if api_ok else "🔷"
+        api_label = "Connected" if api_ok else "Local Mode"
         st.markdown(
             f"<div style='font-size:0.85rem;'>{env_dot} <b>{env_label}</b><br/>"
             f"{api_dot} API: {api_label}</div>",

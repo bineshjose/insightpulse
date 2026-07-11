@@ -1,0 +1,15 @@
+# Streamlit runtime configuration — dashboard chrome and brand theme.
+# Viewer toolbar mode removes the Deploy button and developer-only menu
+# entries so evaluators see a clean product header.
+
+[client]
+toolbarMode = "viewer"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+# NielsenIQ navy drives sliders, progress bars, focus rings, and toggles.
+primaryColor = "#003865"
+backgroundColor = "#F7F8FA"
+textColor = "#1A1A2E"

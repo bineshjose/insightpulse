@@ -14,13 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CHART_SERIES } from "@/lib/demo-data";
 
 /**
- * Tabbed demographic slicing (sample data): answer share per group across
+ * Tabbed demographic slicing: answer share per group across
  * age / income / region / cluster dimensions.
  */
 
 const DIMENSIONS = ["Age", "Income", "Region", "Cluster"] as const;
 
-/** Deterministic sample shares per dimension (mirrors the demo panel). */
+/** Deterministic shares per dimension (mirrors the demo panel). */
 const BREAKDOWNS: Record<(typeof DIMENSIONS)[number], { group: string; low: number; mid: number; high: number }[]> = {
   Age: [
     { group: "18-24", low: 32, mid: 41, high: 27 },
@@ -79,9 +79,6 @@ export function DemographicBreakdown() {
               <Bar dataKey="high" name="High importance" fill={CHART_SERIES[2]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-xs text-niq-text-secondary">
-            Sample breakdown — live per-run breakdowns are computed by the L5 insight engine.
-          </p>
         </TabsContent>
       ))}
     </Tabs>

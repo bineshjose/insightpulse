@@ -12,13 +12,21 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ApiError, runSurvey } from "@/lib/api";
 import { hasPermission, useAuth } from "@/lib/auth";
-import { SUPPORTED_MODELS, storeLastRun } from "@/lib/demo-data";
+import {
+  CATEGORIES,
+  CLIENTS,
+  PRIORITIES,
+  SUPPORTED_MODELS,
+  makeSurveyId,
+  storeLastRun,
+  suggestContractId,
+} from "@/lib/demo-data";
 import { cn, formatUsd } from "@/lib/utils";
 import type { SurveyRunResponse } from "@/lib/types";
 
-const STEPS = ["Questions", "Cohort", "Config", "Review & Run"] as const;
+const STEPS = ["Setup", "Questions", "Cohort", "Config", "Review & Run"] as const;
 
-/** Rough per-response cost by model family (matches simulation profiles). */
+/** Rough per-response cost by model family (matches the demo profiles). */
 const COST_PER_RESPONSE: Record<string, number> = {
   "claude-sonnet-4-6": 0.0022,
   "gpt-4o": 0.0014,
@@ -26,11 +34,18 @@ const COST_PER_RESPONSE: Record<string, number> = {
   "ollama/llama3.1": 0,
 };
 
-/** Multi-step survey wizard: Questions → Cohort → Config → Review → Run. */
+/** Multi-step survey wizard: Setup → Questions → Cohort → Config → Review → Run. */
 export default function SurveyPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [step, setStep] = useState(0);
+  const [surveyName, setSurveyName] = useState("");
+  const [client, setClient] = useState<string>(CLIENTS[0]);
+  const [contractId, setContractId] = useState<string>(suggestContractId(CLIENTS[0]));
+  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const [priority, setPriority] = useState<string>("Medium");
+  const [dueDate, setDueDate] = useState("");
+  const [notes, setNotes] = useState("");
   const [questions, setQuestions] = useState<string[]>([
     "How important is organic labeling when purchasing snacks?",
   ]);
@@ -50,10 +65,16 @@ export default function SurveyPage() {
   const validQuestions = questions.map((q) => q.trim()).filter(Boolean);
   const estimatedCost = cohort.size * validQuestions.length * (COST_PER_RESPONSE[model] ?? 0.002);
 
+  const selectClient = (name: string) => {
+    setClient(name);
+    setContractId(suggestContractId(name));
+  };
+
   const stepValid = useMemo(() => {
-    if (step === 0) return validQuestions.length > 0;
+    if (step === 0) return surveyName.trim().length > 0;
+    if (step === 1) return validQuestions.length > 0;
     return true;
-  }, [step, validQuestions.length]);
+  }, [step, surveyName, validQuestions.length]);
 
   if (!canRun) {
     return (
@@ -88,8 +109,25 @@ export default function SurveyPage() {
         cohort_filters: filters,
         seed,
       });
-      storeLastRun(run);
-      setResult(run);
+      const enriched: SurveyRunResponse = {
+        ...run,
+        metadata: {
+          survey_id: makeSurveyId(143),
+          survey_name: surveyName.trim(),
+          client_name: client,
+          contract_id: contractId.trim(),
+          category,
+          region: user?.regions.join(", ") ?? "",
+          priority,
+          executor_name: user?.name ?? "",
+          executor_email: user?.email ?? "",
+          created_at: new Date().toISOString(),
+          due_date: dueDate || null,
+          notes: notes.trim(),
+        },
+      };
+      storeLastRun(enriched);
+      setResult(enriched);
     } catch (caught) {
       setError(
         caught instanceof ApiError
@@ -133,24 +171,102 @@ export default function SurveyPage() {
         <CardHeader>
           <CardTitle>{STEPS[step]}</CardTitle>
           <CardDescription>
-            {step === 0 && "Add survey questions — types are auto-detected by the SurveyDesigner."}
-            {step === 1 && "Size the cohort and optionally filter by demographics."}
-            {step === 2 && "Choose the generating model and reproducibility seed."}
-            {step === 3 && "Review the configuration, then run the 8-agent pipeline."}
+            {step === 0 && "Name the survey and attach the client engagement."}
+            {step === 1 && "Add survey questions — types are auto-detected by the SurveyDesigner."}
+            {step === 2 && "Size the cohort and optionally filter by demographics."}
+            {step === 3 && "Choose the generating model and reproducibility seed."}
+            {step === 4 && "Review the configuration, then run the pipeline."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {step === 0 && (
-            <QuestionForm questions={questions} onChange={setQuestions} maxQuestions={20} />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="survey-name">Survey name</Label>
+                <input
+                  id="survey-name"
+                  type="text"
+                  value={surveyName}
+                  placeholder="e.g. Organic Labeling Importance"
+                  onChange={(event) => setSurveyName(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-niq-border px-3 text-sm focus:border-niq-blue focus:outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="client">Client</Label>
+                  <Select
+                    id="client"
+                    options={CLIENTS.map((c) => ({ value: c, label: c }))}
+                    value={client}
+                    onChange={(event) => selectClient(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contract">Contract ID</Label>
+                  <input
+                    id="contract"
+                    type="text"
+                    value={contractId}
+                    onChange={(event) => setContractId(event.target.value)}
+                    className="h-10 w-full rounded-lg border border-niq-border px-3 font-mono text-sm focus:border-niq-blue focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    id="category"
+                    options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                    value={category}
+                    onChange={(event) => setCategory(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select
+                    id="priority"
+                    options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+                    value={priority}
+                    onChange={(event) => setPriority(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="due-date">Due date (optional)</Label>
+                  <input
+                    id="due-date"
+                    type="date"
+                    value={dueDate}
+                    onChange={(event) => setDueDate(event.target.value)}
+                    className="h-10 w-full rounded-lg border border-niq-border px-3 text-sm focus:border-niq-blue focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <textarea
+                  id="notes"
+                  value={notes}
+                  rows={2}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="w-full rounded-lg border border-niq-border px-3 py-2 text-sm focus:border-niq-blue focus:outline-none"
+                />
+              </div>
+              <p className="text-xs text-niq-text-secondary">
+                Region: {user?.regions.join(", ")} · Executor: {user?.name} ({user?.email})
+              </p>
+            </div>
           )}
           {step === 1 && (
+            <QuestionForm questions={questions} onChange={setQuestions} maxQuestions={20} />
+          )}
+          {step === 2 && (
             <CohortConfig
               value={cohort}
               onChange={setCohort}
               maxSize={Math.min(user?.maxCohortSize ?? 1000, 5000)}
             />
           )}
-          {step === 2 && (
+          {step === 3 && (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="model">LLM model</Label>
@@ -179,8 +295,13 @@ export default function SurveyPage() {
               </div>
             </div>
           )}
-          {step === 3 && !running && !result && (
+          {step === 4 && !running && !result && (
             <div className="space-y-3 text-sm">
+              <ReviewRow label="Survey" value={surveyName.trim() || "—"} />
+              <ReviewRow label="Client" value={client} />
+              <ReviewRow label="Contract" value={contractId} />
+              <ReviewRow label="Category" value={category} />
+              <ReviewRow label="Priority" value={priority} />
               <ReviewRow label="Questions" value={`${validQuestions.length}`} />
               <ReviewRow label="Cohort size" value={`${cohort.size} respondents`} />
               <ReviewRow
@@ -191,14 +312,13 @@ export default function SurveyPage() {
                 }
               />
               <ReviewRow label="Model" value={model} />
-              <ReviewRow label="Seed" value={String(seed)} />
               <ReviewRow label="Estimated cost" value={formatUsd(estimatedCost)} />
               <Button className="mt-2 w-full" onClick={execute}>
                 <Rocket className="h-4 w-4" /> Run Survey
               </Button>
             </div>
           )}
-          {step === 3 && (running || result) && (
+          {step === 4 && (running || result) && (
             <div className="space-y-4">
               <RunProgress done={result !== null} />
               {result && (
@@ -223,8 +343,7 @@ export default function SurveyPage() {
                     <p className="font-bold text-niq-red">Run failed</p>
                     <p className="text-niq-text-secondary">{error}</p>
                     <p className="mt-1 text-xs text-niq-text-secondary">
-                      Is the backend running? Start it with <code>make demo</code> — demo mode
-                      needs no API keys.
+                      Is the backend running? Start it with <code>make demo</code>.
                     </p>
                   </div>
                 </div>

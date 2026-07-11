@@ -6,7 +6,7 @@ import { AgentTimeline } from "@/components/charts/timeline";
 import { ExportButton } from "@/components/common/export-button";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RECENT_RUNS, SAMPLE_RUN, loadLastRun } from "@/lib/demo-data";
+import { LATEST_RUN, RECENT_RUNS, loadLastRun } from "@/lib/demo-data";
 import { formatNumber, formatPercent, formatUsd } from "@/lib/utils";
 import type { SurveyRunResponse } from "@/lib/types";
 
@@ -24,8 +24,9 @@ import type { SurveyRunResponse } from "@/lib/types";
  * reproduce command, and run history.
  */
 export default function AuditPage() {
-  const [run, setRun] = useState<SurveyRunResponse>(SAMPLE_RUN);
+  const [run, setRun] = useState<SurveyRunResponse>(LATEST_RUN);
   const [copied, setCopied] = useState(false);
+  const meta = run.metadata;
 
   useEffect(() => {
     const stored = loadLastRun();
@@ -50,8 +51,11 @@ export default function AuditPage() {
       <div>
         <h1 className="text-2xl font-bold text-niq-navy">Audit Trail</h1>
         <p className="text-sm text-niq-text-secondary">
-          Full provenance for run <span className="font-mono">{run.run_id}</span> — replayable
-          by construction.
+          Full provenance for{" "}
+          <span className="font-semibold text-niq-navy">
+            {meta?.survey_id ?? `run ${run.run_id}`}
+          </span>
+          {meta ? ` — ${meta.survey_name}` : ""}.
         </p>
       </div>
 
@@ -59,7 +63,6 @@ export default function AuditPage() {
         <Card>
           <CardHeader>
             <CardTitle>Provenance</CardTitle>
-            <CardDescription>SHA-256 fingerprint of the run configuration.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-center gap-2">
@@ -70,12 +73,25 @@ export default function AuditPage() {
                 {copied ? <Check className="h-4 w-4 text-niq-green" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
+            {meta && (
+              <>
+                <ConfigRow label="Client" value={meta.client_name} />
+                <ConfigRow label="Contract" value={meta.contract_id} />
+                <ConfigRow label="Category" value={meta.category} />
+                <ConfigRow label="Priority" value={meta.priority} />
+                <ConfigRow label="Executor" value={meta.executor_name} />
+              </>
+            )}
             <ConfigRow label="Status" value={run.status} />
             <ConfigRow label="Responses" value={formatNumber(run.total_responses)} />
             <ConfigRow label="Hallucination rate" value={formatPercent(run.hallucination_rate)} />
             <ConfigRow label="Total cost" value={formatUsd(run.total_cost_usd)} />
             <div className="pt-2">
-              <ExportButton filename={`audit_${run.run_id}`} data={run} format="json" />
+              <ExportButton
+                filename={`audit_${meta?.survey_id ?? run.run_id}`}
+                data={run}
+                format="json"
+              />
             </div>
           </CardContent>
         </Card>
@@ -83,9 +99,6 @@ export default function AuditPage() {
         <Card>
           <CardHeader>
             <CardTitle>Reproduce this run</CardTitle>
-            <CardDescription>
-              Same request + same seed ⇒ identical responses and provenance hash.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="overflow-x-auto rounded-lg bg-niq-navy p-4 text-xs leading-relaxed text-white">
@@ -98,7 +111,6 @@ export default function AuditPage() {
       <Card>
         <CardHeader>
           <CardTitle>Agent execution timeline</CardTitle>
-          <CardDescription>The 8-agent LangGraph DAG in execution order.</CardDescription>
         </CardHeader>
         <CardContent>
           <AgentTimeline trace={run.agent_trace} />
@@ -108,27 +120,34 @@ export default function AuditPage() {
       <Card>
         <CardHeader>
           <CardTitle>Run history</CardTitle>
-          <CardDescription>Sample history — live runs join the top of this table.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Survey ID</TableHead>
                 <TableHead>Survey</TableHead>
+                <TableHead>Client</TableHead>
                 <TableHead>Respondents</TableHead>
                 <TableHead>Model</TableHead>
+                <TableHead>Hallucination</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {RECENT_RUNS.map((entry) => (
-                <TableRow key={entry.survey}>
+                <TableRow key={entry.surveyId}>
+                  <TableCell className="font-mono text-xs">{entry.surveyId}</TableCell>
                   <TableCell className="font-semibold">{entry.survey}</TableCell>
+                  <TableCell>{entry.client}</TableCell>
                   <TableCell>{formatNumber(entry.respondents)}</TableCell>
                   <TableCell className="font-mono text-xs">{entry.model}</TableCell>
+                  <TableCell>{entry.hallucination}</TableCell>
                   <TableCell>
                     <StatusBadge status="healthy" label="Completed" />
                   </TableCell>
+                  <TableCell className="text-niq-text-secondary">{entry.date}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

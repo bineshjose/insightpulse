@@ -32,7 +32,7 @@ import { formatPercent } from "@/lib/utils";
 
 const EPSILONS = ["0.01", "0.05", "0.1", "0.5"] as const;
 
-/** Experiments hub: tabbed access to the four thesis experiments. */
+/** Experiments hub: tabbed access to the four experiment tracks. */
 export default function ExperimentsPage() {
   const [activeEpsilons, setActiveEpsilons] = useState<string[]>(["0.01", "0.1", "0.5"]);
 
@@ -45,10 +45,6 @@ export default function ExperimentsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-niq-navy">Experiments</h1>
-        <p className="text-sm text-niq-text-secondary">
-          The four reproducible thesis experiments — values from{" "}
-          <code>experiments/results/</code> (regenerate with <code>make experiments</code>).
-        </p>
       </div>
 
       <Tabs defaultValue="llm">
@@ -79,7 +75,6 @@ export default function ExperimentsPage() {
           <Card className="mt-4">
             <CardHeader>
               <CardTitle>Model profile radar</CardTitle>
-              <CardDescription>All axes normalized: 100 = best observed value.</CardDescription>
             </CardHeader>
             <CardContent>
               <ModelRadarChart />
@@ -91,10 +86,6 @@ export default function ExperimentsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Sinkhorn convergence by ε</CardTitle>
-              <CardDescription>
-                Marginal error per iteration. ε trades convergence speed against
-                transport-plan sharpness — production uses ε = 0.1.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="mb-3 flex flex-wrap gap-4">
@@ -117,10 +108,6 @@ export default function ExperimentsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Category-mix drift vs 3-month baseline</CardTitle>
-              <CardDescription>
-                Trigger = noise mean + 3σ ({DRIFT_TRIGGER}). Two consecutive months above
-                the line fire the retraining pipeline (re-embed → re-cluster → re-fit BDCL).
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -158,10 +145,6 @@ export default function ExperimentsPage() {
           <Card className="mt-4">
             <CardHeader>
               <CardTitle>Within-person consistency by generation strategy</CardTitle>
-              <CardDescription>
-                Conditioning raises consistency well above the demographic floor while
-                leaving marginal distributions unchanged.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>

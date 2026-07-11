@@ -104,7 +104,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs leading-relaxed text-white/65">
           IIT Madras &nbsp;×&nbsp; NielsenIQ
           <br />
-          M.Tech Industrial AI Thesis — Binesh Jose (CH24M521)
+          M.Tech Industrial AI Project — Binesh Jose (CH24M521)
         </p>
       </div>
     </main>

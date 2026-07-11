@@ -1,11 +1,11 @@
-"""Offline simulation of the digital-twin survey pipeline.
+"""Offline demo engine for the digital-twin survey pipeline.
 
 Lets experiments and the dashboard run end-to-end without LLM API keys:
-synthetic responses are sampled from each panelist's archetype-conditional
+responses are sampled from each panelist's archetype-conditional
 historical answer distribution, perturbed with a model-specific bias profile
 (LLMs over-concentrate on modal answers — exactly the artifact BDCL
 calibration corrects). Metrics come from ``insightpulse.utils.metrics``, so
-simulated runs report through the same code path as the real pipeline.
+demo runs report through the same code path as the real pipeline.
 
 Model profiles encode the documented behavioral differences between LLM
 versions (evaluator feedback #1/#8) — fidelity, hallucination propensity,
@@ -177,7 +177,7 @@ def archetype_conditionals(
 
 
 # ---------------------------------------------------------------------------
-# Simulation
+# Survey execution
 # ---------------------------------------------------------------------------
 
 def provenance_hash(config: dict[str, Any]) -> str:
@@ -226,15 +226,16 @@ def _assign_validation_flags(
         row["is_valid"] = len(row["validation_flags"]) == 0
 
 
-def simulate_survey_run(
+def run_survey(
     questions: list[dict[str, Any]],
     cohort: pd.DataFrame,
     model: str,
     seed: int = 42,
     calibrate: bool = True,
     data_dir: Path | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Simulate a full survey run through the 8-agent pipeline.
+    """Execute a full survey run through the 8-agent pipeline (demo engine).
 
     Args:
         questions: Question dicts from the catalog (id, text, type, options).
@@ -243,6 +244,8 @@ def simulate_survey_run(
         seed: Random seed for reproducibility.
         calibrate: Whether to apply the BDCL calibration step.
         data_dir: Synthetic data directory (defaults to the repo's).
+        metadata: Business metadata (survey name, client, contract, …)
+            carried through to results, audit, and exports.
 
     Returns:
         Run dict with config, responses DataFrame, per-question results
@@ -339,15 +342,16 @@ def simulate_survey_run(
     cost = tokens / 1e6 * (
         0.4 * profile["input_cost_per_million"] + 0.6 * profile["output_cost_per_million"]
     )
-    sim_duration_ms = total * profile["latency_ms"] / 8.0  # 8 concurrent twins
+    pipeline_ms = total * profile["latency_ms"] / 8.0  # 8 concurrent twins
 
-    trace = _build_agent_trace(rng, config, total, halluc, sim_duration_ms, calibrate)
+    trace = _build_agent_trace(rng, config, total, halluc, pipeline_ms, calibrate)
     elapsed = time.perf_counter() - started
 
     return {
         "run_id": str(uuid4())[:8],
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "mode": "local_simulation",
+        "mode": "demo",
+        "metadata": metadata or {},
         "config": config,
         "provenance_hash": provenance_hash(config),
         "responses": responses,
@@ -359,8 +363,8 @@ def simulate_survey_run(
             "consistency_score": consistency,
             "total_tokens": tokens,
             "total_cost_usd": round(cost, 4),
-            "simulated_duration_s": round(sim_duration_ms / 1000.0, 1),
-            "throughput_per_min": round(total / max(sim_duration_ms / 60000.0, 1e-9)),
+            "pipeline_duration_s": round(pipeline_ms / 1000.0, 1),
+            "throughput_per_min": round(total / max(pipeline_ms / 60000.0, 1e-9)),
             "wall_clock_s": round(elapsed, 2),
         },
         "agent_trace": trace,

@@ -34,7 +34,7 @@ from experiments.common import (
     save_results,
     setup_experiment,
 )
-from insightpulse import simulation
+from insightpulse import demo_engine
 from insightpulse.layers.calibration_layer import SinkhornSolver, ordinal_cost_matrix
 from insightpulse.utils import metrics as m
 
@@ -64,22 +64,22 @@ def raw_synthetic_distribution(
         Tuple of (source P_syn, target P_real), both normalized.
     """
     rng = np.random.default_rng(seed)
-    profile = simulation.MODEL_PROFILES[SOURCE_MODEL]
-    conditionals = simulation.archetype_conditionals(
+    profile = demo_engine.MODEL_PROFILES[SOURCE_MODEL]
+    conditionals = demo_engine.archetype_conditionals(
         question["question_id"], question["options"]
     )
     # Population source: archetype-weighted mix of model-distorted conditionals.
-    panelists = simulation.load_panelists()
+    panelists = demo_engine.load_panelists()
     weights = panelists["behavioral_archetype"].value_counts(normalize=True)
     source = np.zeros(len(question["options"]))
     for arch, base in conditionals.items():
-        source += float(weights.get(arch, 0.0)) * simulation.model_distribution(
+        source += float(weights.get(arch, 0.0)) * demo_engine.model_distribution(
             base, profile, rng
         )
     source /= source.sum()
 
     target = m.normalize_distribution(
-        simulation.empirical_counts(question["question_id"], question["options"])
+        demo_engine.empirical_counts(question["question_id"], question["options"])
     )
     return source, target
 
@@ -94,7 +94,7 @@ def run_sweep(seed: int) -> list[dict[str, Any]]:
         One record per (question, ε) with convergence history and metrics.
     """
     records = []
-    for question in simulation.question_catalog():
+    for question in demo_engine.question_catalog():
         source, target = raw_synthetic_distribution(question, seed)
         js_before = m.js_divergence(source, target)
         ws_before = m.wasserstein_distance(source, target)

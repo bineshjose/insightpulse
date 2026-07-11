@@ -12,9 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { SAMPLE_RUN, loadLastRun } from "@/lib/demo-data";
+import { LATEST_RUN, formatRunDate, loadLastRun } from "@/lib/demo-data";
 import { formatPercent } from "@/lib/utils";
 import type { SurveyRunResponse } from "@/lib/types";
+
+/** Run selector label: "Organic Labeling Importance · Jul 11, 2026 · 250 respondents". */
+function runLabel(run: SurveyRunResponse): string {
+  const name = run.metadata?.survey_name ?? `Run ${run.run_id}`;
+  const created = run.metadata?.created_at
+    ? formatRunDate(new Date(run.metadata.created_at)).split(" · ")[0]
+    : "";
+  return [name, created, `${run.total_responses} respondents`].filter(Boolean).join(" · ");
+}
 
 /**
  * Results: run selector, distribution chart (raw vs calibrated), the metric
@@ -22,7 +31,7 @@ import type { SurveyRunResponse } from "@/lib/types";
  */
 export default function ResultsPage() {
   const [liveRun, setLiveRun] = useState<SurveyRunResponse | null>(null);
-  const [selected, setSelected] = useState<"live" | "sample">("sample");
+  const [selected, setSelected] = useState<"live" | "latest">("latest");
 
   useEffect(() => {
     const stored = loadLastRun();
@@ -32,8 +41,9 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const run = selected === "live" && liveRun ? liveRun : SAMPLE_RUN;
+  const run = selected === "live" && liveRun ? liveRun : LATEST_RUN;
   const result = run.results[0];
+  const meta = run.metadata;
 
   if (!result) {
     return (
@@ -52,8 +62,8 @@ export default function ResultsPage() {
 
   const metrics = result.calibration_metrics;
   const runOptions = [
-    ...(liveRun ? [{ value: "live", label: `Live run ${liveRun.run_id}` }] : []),
-    { value: "sample", label: "Sample run (Organic Labeling, 250 respondents)" },
+    ...(liveRun ? [{ value: "live", label: runLabel(liveRun) }] : []),
+    { value: "latest", label: runLabel(LATEST_RUN) },
   ];
 
   return (
@@ -61,9 +71,18 @@ export default function ResultsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-niq-navy">Survey Results</h1>
-          <p className="text-sm text-niq-text-secondary">
-            Raw vs calibrated distributions with the full evaluation metric suite.
-          </p>
+          {meta ? (
+            <p className="text-sm text-niq-text-secondary">
+              <span className="font-semibold text-niq-navy">{meta.survey_name}</span>
+              {" | "}Client: {meta.client_name}
+              {" | "}Contract: {meta.contract_id}
+              {" | "}{meta.category}
+            </p>
+          ) : (
+            <p className="text-sm text-niq-text-secondary">
+              Raw vs calibrated distributions with the full evaluation metric suite.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Select
@@ -71,7 +90,7 @@ export default function ResultsPage() {
             className="w-72"
             options={runOptions}
             value={selected}
-            onChange={(event) => setSelected(event.target.value as "live" | "sample")}
+            onChange={(event) => setSelected(event.target.value as "live" | "latest")}
           />
           <ExportButton filename={`run_${run.run_id}_results`} data={run.results} format="json" />
           <ExportButton

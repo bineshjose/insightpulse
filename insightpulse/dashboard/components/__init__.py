@@ -1,1 +1,1 @@
-"""Shared dashboard components: data loading, simulation, and chart builders."""
+"""Shared dashboard components: data loading, the demo engine, and chart builders."""

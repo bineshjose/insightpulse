@@ -45,14 +45,14 @@ API_VERSION = "1.0.0"
 
 
 def _known_models() -> set[str]:
-    """Models the pipeline can serve (single source: simulation profiles).
+    """Models the pipeline can serve (single source: demo profiles).
 
-    Both L3 strategies understand exactly this set — the simulated engine
+    Both L3 strategies understand exactly this set — the demo engine
     needs a bias profile per model, and the production router's parameter
     profiles cover the same families — so requests for anything else fail
     fast at validation instead of mid-pipeline.
     """
-    from insightpulse.simulation import MODEL_PROFILES
+    from insightpulse.demo_engine import MODEL_PROFILES
 
     return set(MODEL_PROFILES)
 

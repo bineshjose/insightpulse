@@ -108,6 +108,32 @@ def apply_base_layout(fig: go.Figure, title: str | None = None, height: int = 38
     return fig
 
 
+def _shorten_options(options: list[str]) -> list[str]:
+    """Shorten option labels by dropping a shared trailing-word suffix.
+
+    "Not at all important" → "Not at all": the repeated word carries no
+    information on the axis and forces truncation on narrow charts.
+
+    Args:
+        options: Option labels in scale order.
+
+    Returns:
+        Display labels ("Not at all important" → "Not at all") — unchanged
+        when the options share no common trailing words.
+    """
+    if len(options) < 2:
+        return options
+    split = [str(o).split() for o in options]
+    shared = 0
+    while all(len(words) > shared + 1 for words in split) and len(
+        {tuple(words[len(words) - shared - 1:]) for words in split}
+    ) == 1:
+        shared += 1
+    if shared == 0:
+        return [str(o) for o in options]
+    return [" ".join(words[:len(words) - shared]) for words in split]
+
+
 def distribution_chart(
     options: Sequence[str],
     series: dict[str, Sequence[float]],
@@ -128,12 +154,13 @@ def distribution_chart(
     Returns:
         A styled plotly figure.
     """
+    display_options = _shorten_options(list(options))
     fig = go.Figure()
     fallback = iter(CATEGORICAL)
     for name, values in series.items():
         color = SERIES_COLORS.get(name) or MODEL_COLORS.get(name) or next(fallback)
         fig.add_bar(
-            x=list(options),
+            x=display_options,
             y=list(values),
             name=name,
             marker={"color": color, "line": {"width": 0}},

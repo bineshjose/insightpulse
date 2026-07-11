@@ -75,7 +75,7 @@ TIER_COLORS = {
 }
 
 _FOOTER_TEXT = (
-    "InsightPulse v1.0.0 &nbsp;|&nbsp; M.Tech Industrial AI Thesis — "
+    "InsightPulse v1.0.0 &nbsp;|&nbsp; M.Tech Industrial AI Project — "
     "IIT Madras × NielsenIQ &nbsp;|&nbsp; Binesh Jose (CH24M521) "
     "&nbsp;|&nbsp; © 2025-2026"
 )
@@ -250,13 +250,37 @@ footer {{ visibility: hidden; }}
     border-color: {BLUE};
     box-shadow: 0 0 0 1px {BLUE};
 }}
+/* Sliders: navy thumb, value label, and tick text (overrides the default
+   red theme even when no config.toml is picked up at launch). */
 .stSlider [data-baseweb="slider"] div[role="slider"] {{
-    background-color: {NAVY};
-    border-color: {NAVY};
+    background-color: {NAVY} !important;
+    border-color: {NAVY} !important;
+    box-shadow: none !important;
+}}
+.stSlider [data-testid="stSliderThumbValue"] {{ color: {NAVY} !important; }}
+.stSlider [data-testid="stSliderTickBar"] {{ color: {TEXT_SECONDARY} !important; }}
+
+/* Multiselect tags (selected questions/filters): NIQ blue, white text. */
+.stMultiSelect [data-baseweb="tag"] {{
+    background-color: {BLUE} !important;
+    color: #FFFFFF !important;
+}}
+.stMultiSelect [data-baseweb="tag"] span, .stMultiSelect [data-baseweb="tag"] svg {{
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}}
+
+/* Toggles: NIQ blue when on, default gray when off. */
+label[data-baseweb="checkbox"]:has(input[aria-checked="true"]) > div:first-of-type {{
+    background-color: {BLUE} !important;
 }}
 .stCheckbox [data-baseweb="checkbox"] span, .stToggle span {{
     border-color: {NAVY};
 }}
+
+/* One eye icon only: suppress the browser-native password reveal so it
+   doesn't double up with Streamlit's toggle. */
+input::-ms-reveal, input::-ms-clear {{ display: none; }}
 
 /* ---- progress ---- */
 .stProgress > div > div > div > div {{ background-color: {NAVY}; }}

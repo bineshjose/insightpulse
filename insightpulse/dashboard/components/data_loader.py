@@ -44,7 +44,7 @@ def require_data() -> bool:
     if data_available():
         return True
     st.warning(
-        "Synthetic sample data not found. Generate it first:\n\n"
+        "Panel data not found. Generate it first:\n\n"
         "```bash\nmake generate-data\n```",
         icon="⚠️",
     )

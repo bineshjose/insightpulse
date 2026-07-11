@@ -19,7 +19,7 @@ production strategy — selected once, at the composition root
 |---|---|---|---|
 | **L1 Data** | `DataRepository` | `CSVRepository` (sample CSVs) | `SQLRepository` (PostgreSQL, pooled, retried, CSV fallback) |
 | **L2 Embedding** | `EmbeddingEngine` | `PrecomputedEmbeddingEngine` (features + seeded projection) | `TransformerEmbeddingEngine` (tokenizer → transformer → K-Means → FAISS) |
-| **L3 Generation** | `GenerationEngine` | `SimulatedGenerationEngine` (archetype-conditional statistics) | `LLMGenerationEngine` (concurrent, retried, circuit-broken LLM calls) |
+| **L3 Generation** | `GenerationEngine` | `DemoGenerationEngine` (archetype-conditional statistics) | `LLMGenerationEngine` (concurrent, retried, circuit-broken LLM calls) |
 | **L4 Calibration** | `CalibrationEngine` | `SimpleCalibrationEngine` (convex blend) | `SinkhornCalibrationEngine` (log-domain entropic OT) |
 | **L5 Insight** | `InsightEngine` | `BasicInsightEngine` (aggregation) | `FullInsightEngine` (chi-square breakdowns, drift detection) |
 
@@ -118,11 +118,11 @@ sequenceDiagram
 - **`src/insightpulse/utils/metrics.py`** — the single implementation of
   every evaluation metric (JS, Wasserstein, entropy, hallucination rate);
   dashboard, agents, and experiments all report through it.
-- **`src/insightpulse/simulation.py`** — the offline twin simulator used
+- **`src/insightpulse/demo_engine.py`** — the offline twin engine used
   by demo L3, the dashboard, and the experiments.
 - **`experiments/`** — the four reproducible thesis experiments.
 - **`dashboard/`** — Streamlit UI (5 pages) consuming the API or the
-  simulation engine directly.
+  demo engine directly.
 
 ## Cross-cutting concerns
 

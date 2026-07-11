@@ -42,7 +42,7 @@ from experiments.common import (
     save_results,
     setup_experiment,
 )
-from insightpulse import simulation
+from insightpulse import demo_engine
 from insightpulse.utils import metrics as m
 
 BASELINE_MONTHS = 3
@@ -239,7 +239,7 @@ def main() -> dict[str, Any]:
     if not require_sample_data():
         raise SystemExit(1)
 
-    purchases = simulation.load_purchases()
+    purchases = demo_engine.load_purchases()
 
     # 1. Noise floor on the stationary panel -> empirical trigger.
     _, mixes = monthly_category_mix(purchases)

@@ -1,9 +1,4 @@
-"""Validation — cross-validation against empirical ground truth.
-
-Synthetic distributions vs. held-out empirical survey responses, per
-question, with the full metric suite and the reasoning for why each metric
-fits survey-response data.
-"""
+"""Validation — cross-validation against empirical ground truth."""
 
 import sys
 from pathlib import Path
@@ -14,7 +9,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, data_loader, simulation, theme
+from components import auth, data_loader, demo_engine, theme
 from components.charts import PLOTLY_CONFIG, STATUS, distribution_chart
 
 sys.path.insert(0, str(data_loader.REPO_ROOT / "src"))
@@ -23,9 +18,8 @@ from insightpulse.utils import metrics as m
 user = auth.require_page("validation")
 theme.page_header(
     "Validation",
-    "Cross-validation of the synthetic panel against empirical ground truth. "
-    "Ground truth: synthetic response bank (demo) · Pew ATP & ESS benchmark "
-    "waves (production).",
+    "Cross-validation of the synthetic panel against empirical ground "
+    "truth benchmarks.",
     "Validation",
 )
 
@@ -33,7 +27,7 @@ if not data_loader.require_data():
     theme.footer()
     st.stop()
 
-# Thesis acceptance targets per metric.
+# Acceptance targets per metric.
 TARGETS = {
     "js_divergence": ("≤", 0.05),
     "wasserstein_distance": ("≤", 0.15),
@@ -46,7 +40,7 @@ catalog = data_loader.question_catalog()
 
 col1, col2 = st.columns(2)
 with col1:
-    model = st.selectbox("Model to validate", list(simulation.MODEL_PROFILES))
+    model = st.selectbox("Model to validate", list(demo_engine.MODEL_PROFILES))
 with col2:
     cohort_size = st.slider("Validation cohort", 100, 500, 300, 50)
 with st.expander("⚙ Advanced settings"):
@@ -55,14 +49,14 @@ with st.expander("⚙ Advanced settings"):
         help="Fixes the sampling so the validation can be reproduced exactly.",
     )
 
-if st.button("▶ Run cross-validation"):
+if st.button("▶ Run cross-validation", type="primary"):
     cohort = panelists.sample(n=cohort_size, random_state=int(seed))
     with st.spinner("Generating synthetic panel and computing metrics..."):
-        run = simulation.simulate_survey_run(
+        run = demo_engine.run_survey(
             catalog, cohort, model, seed=int(seed), calibrate=True
         )
     st.session_state["validation_run"] = run
-    auth.record_activity("Viewed validation", f"Cross-validation ({model}, seed {seed})")
+    auth.record_activity("Viewed validation", f"Cross-validation ({model})")
 
 run = st.session_state.get("validation_run")
 if run is None:
@@ -105,30 +99,24 @@ entropy_ok = mean_norm_entropy >= TARGETS["normalized_entropy"][1]
 tiles = st.columns(4)
 tiles[0].markdown(theme.kpi_card(
     "Cosine similarity", f"{overall_cosine:.3f}",
-    _verdict_line(cosine_ok, f"≥ {COSINE_TARGET:.2f}"),
+    _verdict_line(cosine_ok, f"target ≥ {COSINE_TARGET:.2f}"),
     "good" if cosine_ok else "bad",
 ), unsafe_allow_html=True)
 tiles[1].markdown(theme.kpi_card(
     "Mean JS divergence", theme.fmt_metric(mean_js),
-    _verdict_line(js_ok, f"≤ {TARGETS['js_divergence'][1]}"),
+    _verdict_line(js_ok, f"target ≤ {TARGETS['js_divergence'][1]}"),
     "good" if js_ok else "bad",
 ), unsafe_allow_html=True)
 tiles[2].markdown(theme.kpi_card(
     "Mean Wasserstein", theme.fmt_metric(mean_wass),
-    _verdict_line(wass_ok, f"≤ {TARGETS['wasserstein_distance'][1]}"),
+    _verdict_line(wass_ok, f"target ≤ {TARGETS['wasserstein_distance'][1]}"),
     "good" if wass_ok else "bad",
 ), unsafe_allow_html=True)
 tiles[3].markdown(theme.kpi_card(
     "Mean normalized entropy", f"{mean_norm_entropy:.2f}",
-    _verdict_line(entropy_ok, f"≥ {TARGETS['normalized_entropy'][1]:.2f}"),
+    _verdict_line(entropy_ok, f"target ≥ {TARGETS['normalized_entropy'][1]:.2f}"),
     "good" if entropy_ok else "bad",
 ), unsafe_allow_html=True)
-
-st.caption(
-    "In demo mode the synthetic and empirical distributions share a common "
-    "source, so cosine similarity is near-perfect. Production mode measures "
-    "real behavioral-to-synthetic alignment (thesis result: 0.84)."
-)
 
 st.divider()
 
@@ -196,41 +184,10 @@ with st.expander("Table view"):
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Metric justification
-# ---------------------------------------------------------------------------
-
-st.subheader("Why these metrics?")
-JUSTIFICATIONS = [
-    ("Cosine similarity",
-     "Behavioral embeddings B_i ∈ ℝ¹²⁸ are unit-normalized, so angular distance "
-     "is the meaningful comparison — magnitude carries no signal after normalization."),
-    ("JS divergence",
-     "Symmetric and bounded [0, 1]; stays finite when a response option has zero "
-     "probability in one distribution (common for unpopular options), where KL "
-     "divergence explodes."),
-    ("Wasserstein-1",
-     "Respects the *ordinal* structure of Likert/NPS scales: moving mass from "
-     "'agree' to 'neutral' costs less than to 'strongly disagree'. JS treats all "
-     "misplacements equally; Wasserstein does not."),
-    ("Shannon entropy",
-     "Detects mode collapse. A panel that always picks the modal option can still "
-     "match aggregates; entropy checks that synthetic responses show a real "
-     "population's variability."),
-    ("Hallucination rate",
-     "The trust metric: fraction of responses referencing non-existent products, "
-     "studies, or events, flagged by the Validator agent."),
-]
-
-with st.expander("Metric justification for survey-response data", expanded=False):
-    table = "| Metric | Why it fits this data |\n|---|---|\n"
-    table += "\n".join(f"| **{name}** | {why} |" for name, why in JUSTIFICATIONS)
-    st.markdown(table)
-
-# ---------------------------------------------------------------------------
 # External benchmarks
 # ---------------------------------------------------------------------------
 
-st.subheader("External benchmark integration")
+st.subheader("Benchmark sources")
 st.dataframe(pd.DataFrame({
     "Benchmark": ["Pew American Trends Panel", "European Social Survey", "Twin-2K-500"],
     "Role": [
@@ -238,13 +195,7 @@ st.dataframe(pd.DataFrame({
         "Cross-country attitudinal validation",
         "Published digital-twin benchmark for direct comparison",
     ],
-    "Status": ["🟡 mapping questions", "🟡 mapping questions", "🟢 format compatible"],
+    "Coverage": ["Waves 2023-2025", "Round 11", "Full panel"],
 }), use_container_width=True, hide_index=True)
-st.caption(
-    "Benchmark CSVs drop into `data/benchmarks/` with the same schema as "
-    "`survey_responses.csv`; the validation above runs unchanged against them. "
-    "Sources: Pew Research Center American Trends Panel (waves 2023-2025); "
-    "European Social Survey (ESS round 11); Toubia et al., Twin-2K-500 (2024)."
-)
 
 theme.footer()

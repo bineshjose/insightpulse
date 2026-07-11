@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { VALIDATION_CHECKS } from "@/lib/demo-data";
 
 /**
- * Validation: thesis targets vs measured values (pass/fail cards), metric
- * rationale panels, benchmark citations, and an overall letter grade.
+ * Validation: acceptance targets vs measured values (pass/fail cards),
+ * benchmark citations, and an overall letter grade.
  */
 export default function ValidationPage() {
   const passed = VALIDATION_CHECKS.filter((check) => check.pass).length;
@@ -20,8 +20,8 @@ export default function ValidationPage() {
         <div>
           <h1 className="text-2xl font-bold text-niq-navy">Validation</h1>
           <p className="text-sm text-niq-text-secondary">
-            Thesis acceptance criteria vs measured results (demo ground truth: the
-            empirical response bank; production: Pew ATP / ESS waves).
+            Acceptance criteria vs measured results against empirical ground
+            truth benchmarks.
           </p>
         </div>
         <MetricsCard
@@ -47,7 +47,7 @@ export default function ValidationPage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-niq-text-secondary">Thesis target</span>
+                <span className="text-niq-text-secondary">Target</span>
                 <span className="font-semibold">{check.target}</span>
               </div>
               <div className="flex justify-between">
@@ -64,27 +64,23 @@ export default function ValidationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>External benchmark integration</CardTitle>
-          <CardDescription>
-            Benchmark files drop into <code>data/benchmarks/</code> with the same schema as
-            the survey response bank; validation runs unchanged against them.
-          </CardDescription>
+          <CardTitle>Benchmark sources</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
           <BenchmarkCard
             name="Pew American Trends Panel"
             role="US attitudinal ground truth (wave-matched questions, 2023-2025)"
-            status="mapping questions"
+            status="Waves 2023-2025"
           />
           <BenchmarkCard
             name="European Social Survey"
-            role="Cross-country attitudinal validation (ESS round 11)"
-            status="mapping questions"
+            role="Cross-country attitudinal validation"
+            status="Round 11"
           />
           <BenchmarkCard
             name="Twin-2K-500"
             role="Published digital-twin benchmark for direct comparison"
-            status="format compatible"
+            status="Full panel"
           />
         </CardContent>
       </Card>

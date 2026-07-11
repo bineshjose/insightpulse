@@ -1,6 +1,7 @@
 """Profile — account details, editable preferences, usage, activity."""
 
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -140,7 +141,12 @@ st.markdown("")
 
 st.markdown("### Usage statistics")
 
-_WEEKS = ["W1", "W2", "W3", "W4", "W5", "W6"]
+# Six week-start labels ending last Monday, e.g. "Jun 2" … "Jul 7".
+_monday = datetime.now() - timedelta(days=datetime.now().weekday())
+_WEEKS = [
+    (_monday - timedelta(weeks=5 - i)).strftime("%b %d").replace(" 0", " ")
+    for i in range(6)
+]
 _SURVEY_TREND = [8, 11, 9, 12, 10, 14]
 _RESPONSE_TREND = [640, 1120, 890, 1710, 1980, 2560]
 _MONTH_SURVEYS = _SURVEY_TREND[-1]
