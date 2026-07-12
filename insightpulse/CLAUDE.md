@@ -62,7 +62,9 @@ These points must be answered in code, experiments, and report:
 - **LangGraph** for agent orchestration (DAG with state checkpointing)
 - **LiteLLM** for multi-model routing (Claude, OpenAI, Ollama)
 - **FastAPI** for REST API
-- **Streamlit** for dashboard (5 tabs: survey runner, results, experiments, validation, audit)
+- **Streamlit** for the analyst dashboard (9 pages: dashboard, data explorer,
+  survey runner, results, experiments, validation, audit, operations, profile)
+- **Next.js/React** production frontend (mirrors the Streamlit dashboard)
 - **PyTorch** for transformer-based behavioral encoder
 - **POT** (Python Optimal Transport) for BDCL Sinkhorn calibration
 - **FAISS** for vector similarity search in cohort selection
@@ -70,6 +72,62 @@ These points must be answered in code, experiments, and report:
 - **Docker Compose** for containerization
 - **SQLite** (demo) / **PostgreSQL** (production) for persistence
 - **Pydantic v2** for all data models
+- **structlog** for structured logging with trace correlation
+- Optional extras: `[observability]` (prometheus-client, OpenTelemetry) and
+  `[security]` (python-jose, passlib); stdlib fallbacks keep demo mode light
+
+---
+
+## Folder Structure
+
+```
+src/insightpulse/
+├── core/            # Pydantic domain models, exceptions, constants
+├── config/          # settings.py + profiles/*.yaml (demo/production/test)
+├── data/            # L1: connectors/, etl/, repositories/
+├── ml/              # L2-L4: embeddings/, generation/, calibration/, llm/
+├── agents/          # L5: 8 LangGraph agents + orchestrator.py DAG
+├── analytics/       # distributions, EDA, insights
+├── security/        # prompt_guard, response_guard, auth (JWT), secrets,
+│                    # input_validator — Facade/Strategy/Chain of Responsibility
+├── observability/   # metrics (Prometheus), tracing (OTel-compatible),
+│                    # health, alerting, dashboard_metrics — Observer/Strategy
+├── api/             # app.py, routes/ (survey, results, health+metrics),
+│                    # middleware/ (auth, rate_limit, security_headers, metrics)
+├── utils/           # metrics (JS/Wasserstein/entropy), logging
+└── demo_engine.py   # key-free statistical twin engine
+
+dashboard/           # Streamlit: app.py, views/home.py, pages/2..9, components/
+frontend/            # Next.js App Router: src/app/(app)/<page>/page.tsx, src/lib/
+experiments/         # 4 reproducible experiments
+tests/               # unit/ (incl. test_security, test_observability), integration/
+infra/               # docker/, k8s/ (+probes, ServiceMonitor), monitoring/
+                     # (Prometheus rules, Grafana dashboard), terraform/, ci/
+docs/                # architecture, data_architecture, security, observability,
+                     # deployment, api, adr/ (8 ADRs)
+```
+
+Import paths follow the tree: `from insightpulse.security import PromptGuard`,
+`from insightpulse.observability import get_metrics_collector`. Profile YAMLs
+live at `src/insightpulse/config/profiles/{env}.yaml` and are resolved
+relative to the package (never the working directory).
+
+---
+
+## Security & Observability Integration Points
+
+- `agents/twin_orchestrator.py` screens questions (PromptGuard) and redacts
+  responses (ResponseGuard) around generation; blocked questions land in the
+  audit trace with `prompt_injection_blocked`.
+- `agents/validator.py` re-checks PII/leakage (`security_check:*` flags).
+- `agents/orchestrator.py` wraps every node with `@trace_agent`, records run
+  metrics, and evaluates alert rules after each run.
+- `api/app.py` middleware order (outermost first): CORS → Tracing →
+  SecurityHeaders → Metrics → RateLimiter → ProductionAuth (production only).
+- Endpoints: `/health` (component-level), `/health/ready`, `/health/live`,
+  `/metrics` (Prometheus text format).
+- All security/observability thresholds live in `SecurityConfig` and
+  `ObservabilityConfig` in `config/settings.py`.
 
 ---
 
@@ -114,18 +172,27 @@ Switch with `ENV` environment variable:
 ## Commands
 
 ```bash
-# Start demo environment
+# Start demo environment (Docker: API + Streamlit + React)
 make demo
 
-# Run tests
+# Run tests (with coverage) / fast
 make test
+make test-fast
 
 # Run experiments
 make experiments
 
-# Generate sample data
+# Generate demo panel data
 make generate-data
 
 # Lint and format
 make lint
+make format
+
+# Data engineering
+make etl-ingest       # benchmark ingestion (external -> ADLS)
+make etl-cohort       # cohort extraction (Snowflake/CSV -> cache)
+make etl-benchmarks   # benchmark ETL (ADLS -> PostgreSQL)
+make etl-quality      # data quality gate
+make data-explore     # EDA summary
 ```

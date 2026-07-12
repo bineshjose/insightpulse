@@ -265,7 +265,7 @@ def main() -> dict[str, Any]:
             "deterministic map but needs 400+ iterations; ε = 0.5 converges in "
             "~10 iterations but blurs the plan toward the independent coupling. "
             "ε = 0.1 (production) converges in ~40 iterations with a still-sharp "
-            "plan — the trade-off documented in config/profiles."
+            "plan — the trade-off documented in src/insightpulse/config/profiles."
         ),
     }
     results_path = save_results("calibration_convergence", payload)

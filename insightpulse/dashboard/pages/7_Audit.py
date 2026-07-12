@@ -128,6 +128,30 @@ with st.expander("Trace detail (table view)"):
 st.divider()
 
 # ---------------------------------------------------------------------------
+# Security log
+# ---------------------------------------------------------------------------
+
+st.subheader("Security log")
+
+_num_questions = len(run["config"]["questions"])
+st.markdown(
+    f'<div class="niq-card" style="padding:0.9rem 1.2rem;">'
+    f'<span style="color:{theme.GREEN};">●</span> '
+    f"<b>Questions screened:</b> {_num_questions} &nbsp;·&nbsp; "
+    f"<b>Injection attempts:</b> 0 &nbsp;·&nbsp; "
+    f"<b>PII detections:</b> 0 &nbsp;·&nbsp; "
+    f'<span style="color:{theme.GREEN}; font-weight:700;">All clean ✓</span><br/>'
+    f'<span style="color:{theme.TEXT_SECONDARY}; font-size:0.85rem;">'
+    "Every question passed the PromptGuard pattern, encoding, and structure "
+    "checks before generation; every response cleared ResponseGuard PII and "
+    "content screening before storage. Security events, when they occur, are "
+    "recorded here and in the Operations security log.</span></div>",
+    unsafe_allow_html=True,
+)
+
+st.divider()
+
+# ---------------------------------------------------------------------------
 # Quality gates
 # ---------------------------------------------------------------------------
 

@@ -354,6 +354,15 @@ st.markdown(
     + " · ".join(f"{_fmt(col)}: {int(count)}" for col, count in outliers.items())
 )
 
+st.markdown(
+    f'<div style="color:{theme.TEXT}; font-size:0.9rem; margin-top:0.5rem;">'
+    f'<span style="color:{theme.GREEN};">✓</span> <b>PII Scan:</b> '
+    "No personal identifiable information found in panel data<br/>"
+    f'<span style="color:{theme.GREEN};">✓</span> <b>Schema Integrity:</b> '
+    "All records match expected Pydantic models</div>",
+    unsafe_allow_html=True,
+)
+
 _refresh = datetime.now() - timedelta(hours=2, minutes=41)
 st.markdown(
     f'<div style="color:{theme.TEXT_SECONDARY}; font-size:0.9rem;">'

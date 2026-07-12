@@ -107,9 +107,11 @@ USERS: dict[str, dict[str, Any]] = {
 # (see render_sidebar) AND gated at render time (see require_page), so a
 # direct URL lands on the Access Restricted card instead of the content.
 PAGE_ACCESS: dict[str, set[str]] = {
+    # Operations (system health, security, alerting, model registry) is
+    # platform-administration surface — no other role sees it at all.
     "Platform Administrator": {
         "home", "data-explorer", "survey-runner", "results", "experiments",
-        "validation", "audit", "profile",
+        "validation", "audit", "operations", "profile",
     },
     # Analysts (and the demo account) work with surveys and results only.
     "Survey Analyst": {"home", "survey-runner", "results", "profile"},
@@ -123,7 +125,7 @@ PAGE_ACCESS: dict[str, set[str]] = {
 
 ALL_PAGE_SLUGS: set[str] = {
     "home", "data-explorer", "survey-runner", "results", "experiments",
-    "validation", "audit", "profile",
+    "validation", "audit", "operations", "profile",
 }
 
 
@@ -510,6 +512,22 @@ def render_sidebar(user: dict[str, Any]) -> None:
             f"{api_dot} API: {api_label}</div>",
             unsafe_allow_html=True,
         )
+        # Security posture is visible on every page, not just Operations:
+        # the prompt guard screens every question before generation.
+        st.markdown(
+            "<div style='font-size:0.78rem; opacity:0.85; margin-top:0.35rem;'>"
+            "🔒 PromptGuard: <b>Active</b> "
+            "<span style='color:#2ECC71;'>●</span></div>",
+            unsafe_allow_html=True,
+        )
+        if "operations" in allowed_pages(user):
+            st.markdown(
+                "<div style='font-size:0.78rem; opacity:0.85; margin-top:0.2rem;'>"
+                "System: <span style='color:#2ECC71;'>●</span> Healthy</div>",
+                unsafe_allow_html=True,
+            )
+            from components import nav as _nav
+            _nav.page_link("pages/8_Operations.py", label="Open Operations →")
         st.divider()
 
         if st.button("Sign out", key="logout_button", use_container_width=True):

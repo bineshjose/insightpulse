@@ -10,6 +10,9 @@ Validation Checks:
     3. Hallucination detection: answer doesn't reference non-existent products/events
     4. Confidence calibration: flag low-confidence responses
     5. Sequential consistency: answer is logically consistent with prior responses
+    6. Security check: no PII and no memorized-training-data artifacts
+       (defense in depth — the TwinOrchestrator redacts at the source;
+       anything surviving to this point is flagged and rejected)
 """
 
 from __future__ import annotations
@@ -19,7 +22,12 @@ from typing import Any
 
 import structlog
 
+from insightpulse.observability.metrics import get_metrics_collector
+from insightpulse.security import ResponseGuard
+
 logger = structlog.get_logger(__name__)
+
+_response_guard = ResponseGuard()
 
 
 async def validator_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -56,12 +64,16 @@ async def validator_node(state: dict[str, Any]) -> dict[str, Any]:
     validated = []
     rejected = []
 
+    collector = get_metrics_collector()
     for response in raw_responses:
         question = question_map.get(response.get("question_id", ""))
         flags = _validate_response(response, question)
 
         response["validation_flags"] = flags
         response["is_valid"] = len(flags) == 0
+        collector.record_validation_check(
+            "response_validation", "pass" if response["is_valid"] else "fail"
+        )
 
         if response["is_valid"]:
             validated.append(response)
@@ -150,6 +162,44 @@ def _validate_response(
     # Check 5: Demographic consistency (basic heuristics)
     demo_flags = _check_demographic_consistency(response, question)
     flags.extend(demo_flags)
+
+    # Check 6: Security — PII or memorized-content leakage that survived
+    # the TwinOrchestrator's redaction pass (should be rare; rejected here).
+    flags.extend(_check_security(response))
+
+    return flags
+
+
+def _check_security(response: dict[str, Any]) -> list[str]:
+    """Security validation: PII and training-data leakage flags.
+
+    Args:
+        response: The response dictionary to check.
+
+    Returns:
+        ``security_check:*`` flags (empty when the response is clean).
+    """
+    flags: list[str] = []
+    combined = f"{response.get('answer', '')} {response.get('reasoning', '')}"
+
+    pii_matches = _response_guard.detect_pii(combined)
+    if pii_matches:
+        flags.append("security_check:pii_detected")
+        collector = get_metrics_collector()
+        for match in pii_matches:
+            collector.record_pii_detection(match.pii_type)
+        logger.warning(
+            "validator_pii_detected",
+            response_id=response.get("response_id", "unknown"),
+            pii_types=sorted({m.pii_type for m in pii_matches}),
+        )
+
+    if _response_guard.detect_data_leakage(combined):
+        flags.append("security_check:data_leakage")
+        logger.warning(
+            "validator_data_leakage_suspected",
+            response_id=response.get("response_id", "unknown"),
+        )
 
     return flags
 

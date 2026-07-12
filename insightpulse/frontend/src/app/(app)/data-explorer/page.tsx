@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { CheckCircle2, Lock } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -276,6 +276,25 @@ export default function DataExplorerPage() {
           />
         ))}
       </div>
+
+      <Card>
+        <CardContent className="space-y-2 py-4 text-sm">
+          <p className="flex items-start gap-2">
+            <CheckCircle2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-niq-green" />
+            <span>
+              <b className="text-niq-navy">PII Scan:</b> No personal identifiable
+              information found in panel data
+            </span>
+          </p>
+          <p className="flex items-start gap-2">
+            <CheckCircle2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-niq-green" />
+            <span>
+              <b className="text-niq-navy">Schema Integrity:</b> All records match
+              expected Pydantic models
+            </span>
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

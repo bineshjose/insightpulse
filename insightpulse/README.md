@@ -4,7 +4,7 @@
 twins of real consumers that answer survey questions, calibrated to empirical
 population distributions via optimal transport.
 
-> M.Tech thesis project, Industrial AI, IIT Madras — in collaboration with NielsenIQ.
+> M.Tech Industrial AI project, IIT Madras — in collaboration with NielsenIQ.
 > Author: Binesh Jose (CH24M521) · Mentors: Noah Tilzer, Vijayakumar Sivagnanam
 
 ---
@@ -62,7 +62,7 @@ graph LR
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# 2. Generate the synthetic sample panel (500 households, 10K purchases)
+# 2. Generate the demo panel (500 households, 10K purchases)
 make generate-data
 
 # 3. Launch the dashboard — Demo Mode runs the full pipeline offline
@@ -94,13 +94,43 @@ demo engine, which reproduces each model's documented bias profile.
 
 ## Dashboard
 
-Five pages under `dashboard/pages/`:
+Nine pages (Streamlit under `dashboard/`, mirrored by the React frontend):
 
-1. **🎯 Survey Runner** — survey setup (client, contract, category, priority), question bank, cohort filters (age/income/region/archetype), model + calibration config; Demo Mode or Production Mode execution
-2. **📊 Results** — raw vs. calibrated vs. empirical distributions, full metric suite, demographic breakdowns, CSV export
-3. **🧪 Experiments** — multi-LLM comparison, Sinkhorn convergence, drift monitoring, sequential-dependency analysis
-4. **✅ Validation** — cross-validation against empirical ground truth with pass/fail verdicts and metric justifications
-5. **📋 Audit** — provenance hash, agent execution trace, quality gates, replay instructions
+1. **Dashboard** — KPI overview, recent runs, architecture summary
+2. **Data Explorer** — panel composition, purchase behavior, archetypes, data quality (incl. PII scan and schema-integrity checks)
+3. **Survey Runner** — survey setup (client, contract, category, priority), question bank, cohort filters, model + calibration config, security-check summary; Demo Mode or Production Mode execution
+4. **Results** — raw vs. calibrated vs. empirical distributions, full metric suite, demographic breakdowns, security badge, CSV export
+5. **Experiments** — multi-LLM comparison (with safety scores), Sinkhorn convergence, drift monitoring, sequential-dependency analysis, run-history tracker with parameter capture
+6. **Validation** — cross-validation against empirical ground truth with pass/fail verdicts, metric justifications, and response-safety verification
+7. **Audit** — provenance hash, agent execution trace, per-run security log, quality gates, replay instructions
+8. **Operations** *(Platform Administrator only)* — system health, security dashboard, performance metrics, alerting, model registry, data lineage, project metrics, API documentation links
+9. **Profile** — account, preferences, usage, activity log
+
+## Security
+
+The security layer (`src/insightpulse/security/`) guards both the API boundary
+and the L3 generation path: **PromptGuard** screens every survey question for
+injection patterns, encoding obfuscation, and template tampering before any
+persona prompt is constructed; **ResponseGuard** scans every generated response
+for PII (redacted at the source), harmful content, and training-data leakage;
+strict input validation rejects malformed or hostile API payloads with typed
+422 errors; and stdlib-implemented JWT auth, API-key validation, per-user rate
+limiting, and hardened response headers protect the REST surface. All
+detections are logged with risk levels and surfaced in the Operations tab.
+See [docs/security.md](docs/security.md) for the full threat model.
+
+## Monitoring
+
+The observability layer (`src/insightpulse/observability/`) provides Prometheus
+metrics (20 counters/histograms/gauges over survey runs, LLM calls, validation,
+calibration, security events, and API traffic, exposed at `/metrics`),
+distributed tracing (one trace per survey run with a child span per agent,
+OpenTelemetry-compatible), component-level health checks (`/health`,
+`/health/ready`, `/health/live` for Kubernetes probes), and a nine-rule alert
+manager with cooldown and firing/resolved state. Grafana dashboards and
+Prometheus alerting rules ship in `infra/monitoring/`. See
+[docs/observability.md](docs/observability.md) for the metrics catalog and
+runbooks.
 
 ## Experiments
 
@@ -135,29 +165,81 @@ Run all: `make experiments`
 insightpulse/
 ├── src/insightpulse/
 │   ├── core/              # Domain models (Pydantic v2), exceptions, constants
-│   ├── config/            # Settings with demo/production/test profiles
+│   ├── config/            # Settings + demo/production/test profile YAMLs
 │   ├── data/              # L1: connectors, ETL pipelines, repositories
 │   ├── ml/                # L2-L4: embeddings, generation, calibration, LLM router
 │   ├── agents/            # L5: 8 LangGraph agents + orchestrator DAG
 │   ├── analytics/         # Insight engines, EDA, distribution analysis
-│   ├── api/               # FastAPI app, routes, middleware
+│   ├── security/          # PromptGuard, ResponseGuard, JWT auth, secrets, input validation
+│   ├── observability/     # Prometheus metrics, tracing, health checks, alerting
+│   ├── api/               # FastAPI app, routes, middleware (auth, rate limit, headers, metrics)
 │   ├── utils/             # Evaluation metrics + structlog configuration
 │   └── demo_engine.py     # Offline twin demo engine (shared by dashboard + experiments)
-├── dashboard/             # Streamlit app (5 pages + shared components)
+├── dashboard/             # Streamlit app (9 pages + shared components)
+├── frontend/              # Next.js/React production frontend (mirrors the dashboard)
 ├── experiments/           # 4 reproducible experiments + shared figure style
 ├── data/demo/             # Panel data generator (+ generated CSVs, git-ignored)
-├── tests/                 # pytest: layers, agents, integration, factories, API
-├── config/profiles/       # Environment profile YAMLs
+├── tests/                 # pytest: layers, agents, integration, security, observability
 ├── infra/terraform/       # Azure infrastructure (AKS, ACR, PostgreSQL, Redis, Key Vault)
-├── infra/k8s/             # Production Kubernetes manifests (HPA, ingress, KV CSI)
+├── infra/k8s/             # Production Kubernetes manifests (HPA, ingress, probes, ServiceMonitor)
+├── infra/monitoring/      # Prometheus alerting rules + Grafana dashboard
 ├── infra/ci/workflows/    # GitHub Actions: CI, CD (semver → AKS), security scans
-└── docs/                  # Architecture, ADRs, API reference, deployment guide
+└── docs/                  # Architecture, ADRs, API reference, security, observability
 ```
+
+## Module inventory
+
+| Module | Description | Design pattern(s) |
+|---|---|---|
+| `core/models` | Typed domain models for panelists, surveys, embeddings, calibration, agent state | — |
+| `config/settings` | Layered settings: env vars → .env → profile YAML → defaults | Strategy (env profiles) |
+| `data/repositories` | Panel data access over CSV (demo) or SQL (production) | Repository |
+| `data/connectors` | Snowflake, ADLS, PostgreSQL, Redis, CSV connectors | Factory, Strategy |
+| `data/etl` | Benchmark + cohort-extraction pipelines with quality gates | Pipeline, Template Method |
+| `ml/embeddings` | Transformer encoder, K-Means archetypes, FAISS index (L2) | Pipeline |
+| `ml/generation` | Persona prompts, LLM + demo engines, response parsing (L3) | Strategy, Circuit Breaker |
+| `ml/calibration` | Sinkhorn optimal transport with fairness constraints (L4) | Pipeline |
+| `ml/llm` | LiteLLM multi-model routing | Strategy |
+| `agents/` | 8 LangGraph agents + DAG orchestration (L5) | Pipeline (DAG) |
+| `security/` | PromptGuard, ResponseGuard, JWT/API-key auth, secrets, input validation | Facade, Strategy, Chain of Responsibility |
+| `observability/` | Metrics, tracing, health checks, alert manager | Observer, Strategy, Decorator |
+| `analytics/` | Distribution analysis, EDA, insight generation | — |
+| `api/` | FastAPI routes + middleware (auth, rate limit, headers, metrics, tracing) | Decorator (middleware) |
+| `utils/` | JS/Wasserstein/entropy metrics, structlog configuration | — |
+| `demo_engine` | Key-free statistical twin engine for offline runs | Strategy |
+
+## Technology stack
+
+| Package | Version | Purpose |
+|---|---|---|
+| fastapi | ≥0.115 | REST API |
+| langgraph | ≥0.2 | Agent DAG orchestration |
+| litellm | ≥1.50 | Multi-model LLM routing (Claude, OpenAI, Ollama) |
+| torch | ≥2.4 | Transformer behavioral encoder (L2) |
+| scikit-learn | ≥1.5 | K-Means archetype clustering |
+| faiss-cpu | ≥1.8 | Cohort vector similarity search |
+| pot | ≥0.9.4 | Sinkhorn optimal transport (L4) |
+| streamlit | ≥1.40 | Analyst dashboard |
+| plotly | ≥5.24 | Dashboard charts |
+| pydantic | ≥2.10 | Typed models and settings |
+| sqlalchemy | ≥2.0 | Persistence (SQLite demo / PostgreSQL production) |
+| structlog | ≥24.4 | Structured logging with trace correlation |
+| pandas / numpy / scipy | ≥2.2 / ≥1.26 / ≥1.14 | Data handling and numerics |
+| httpx | ≥0.27 | HTTP client |
+| tenacity | ≥9.0 | Retry policies |
+
+Optional extras: `pip install -e ".[observability]"` (prometheus-client,
+OpenTelemetry) and `".[security]"` (python-jose, passlib) — the built-in
+stdlib implementations are used when these are absent, so demo mode has no
+extra dependencies.
 
 ## Documentation
 
 - [Architecture overview](docs/architecture.md) — the 5 layers, agent DAG, data flow
-- [Architecture Decision Records](docs/adr/) — LangGraph, LiteLLM, Sinkhorn OT, Strategy pattern, FAISS, AKS
+- [Data architecture](docs/data_architecture.md) — sources, pipelines, storage tiers
+- [Security](docs/security.md) — threat model, PromptGuard/ResponseGuard, auth, GDPR
+- [Observability](docs/observability.md) — metrics catalog, tracing, alerting, runbooks
+- [Architecture Decision Records](docs/adr/) — LangGraph, LiteLLM, Sinkhorn OT, Strategy pattern, FAISS, AKS, security layering, metrics backend
 - [API reference](docs/api.md) — endpoints, validation rules, rate limits
 - [Deployment guide](docs/deployment.md) — local → Docker → AKS production
 - [Evaluator feedback matrix](docs/evaluator-feedback-matrix.md) — every feedback point mapped to code and evidence

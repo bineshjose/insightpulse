@@ -4,7 +4,7 @@ Base URL: `http://localhost:8000` (demo) · `https://api.insightpulse.example.co
 Interactive OpenAPI docs are served at `/docs`.
 
 All endpoints are rate-limited per client (default **60 requests/minute**,
-sliding window; `/health` and `/docs` exempt). Exceeding the limit returns
+sliding window; `/health*`, `/metrics`, and `/docs` exempt). Exceeding the limit returns
 `429` with a `Retry-After` header. Domain failures (provider or database
 outages) return `503` and are safe to retry; validation failures return
 `422` with a specific message.
@@ -13,13 +13,61 @@ outages) return `503` and are safe to retry; validation failures return
 
 ## `GET /health`
 
-Liveness/readiness probe for Docker, Kubernetes, and load balancers.
+Overall health with a component-level breakdown (API, database, cache,
+Snowflake, LLM provider, embedding service, ETL scheduler). Demo mode
+reports local-mode components as `skipped` rather than unhealthy.
 
 **Response `200`**
 
 ```json
-{"status": "healthy", "env": "demo", "version": "1.0.0"}
+{
+  "status": "healthy", "env": "demo", "version": "1.0.0",
+  "components": [
+    {"name": "api", "status": "healthy", "latency_ms": 0.1, "details": "serving"},
+    {"name": "database", "status": "skipped", "latency_ms": 0.0, "details": "skipped (local mode)"}
+  ]
+}
 ```
+
+---
+
+## `GET /health/ready`
+
+Kubernetes readiness probe — `200` when all critical components (API,
+database, LLM provider) are available, `503` otherwise.
+
+---
+
+## `GET /health/live`
+
+Kubernetes liveness probe — `200` with process uptime while the event
+loop is responsive.
+
+```json
+{"status": "alive", "uptime_seconds": 512.4}
+```
+
+---
+
+## `GET /metrics`
+
+Prometheus scrape endpoint (text exposition format, version 0.0.4).
+Exposes survey-run, LLM, validation, calibration, security, and API
+request metrics — see [observability.md](observability.md) for the full
+metrics catalog.
+
+---
+
+## Security
+
+Every response carries hardened headers (`Content-Security-Policy`,
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and
+`Strict-Transport-Security` in production) plus an `X-Request-ID` for
+trace correlation. In production, every `/api/` endpoint requires either
+a `Bearer` JWT or an `X-API-Key` header; demo mode leaves auth optional
+while keeping rate limiting active. Request payloads are validated
+against HTML/script vectors, SQL-injection patterns, model and filter
+allowlists before any pipeline work starts (`422` on failure).
 
 ---
 

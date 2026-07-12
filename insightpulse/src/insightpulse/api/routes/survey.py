@@ -107,6 +107,16 @@ class SurveyRequest(BaseModel):
                     f"Question {index + 1} exceeds "
                     f"{settings.api_max_question_length} characters"
                 )
+
+        # Security layer: HTML/script and SQL-injection pattern rejection
+        # (the PromptGuard screens again inside the pipeline — this is the
+        # cheap 422 at the boundary).
+        from insightpulse.security import validate_questions as security_validate
+
+        issues = security_validate(cleaned)
+        if issues:
+            first = issues[0]
+            raise ValueError(f"{first.field}: {first.message}")
         return cleaned
 
     @field_validator("models")
@@ -130,6 +140,30 @@ class SurveyRequest(BaseModel):
                 f"Unknown model(s) {unknown}. Supported: {sorted(known)}"
             )
         return models
+
+    @field_validator("cohort_filters")
+    @classmethod
+    def validate_cohort_filters(cls, filters: dict[str, str]) -> dict[str, str]:
+        """Reject unknown demographic dimensions and malformed values.
+
+        Args:
+            filters: Requested demographic filters.
+
+        Returns:
+            The validated filters unchanged.
+
+        Raises:
+            ValueError: On unknown keys or invalid values (422 at the API).
+        """
+        if not filters:
+            return filters
+        from insightpulse.security import validate_filters as security_validate
+
+        issues = security_validate(filters)
+        if issues:
+            first = issues[0]
+            raise ValueError(f"{first.field}: {first.message}")
+        return filters
 
 
 class SurveyRunResponse(BaseModel):

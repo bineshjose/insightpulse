@@ -38,6 +38,9 @@ from insightpulse.agents.survey_designer import survey_designer_node
 from insightpulse.agents.twin_orchestrator import twin_orchestrator_node
 from insightpulse.agents.validator import validator_node
 from insightpulse.core.models.agent_state import SurveyPipelineState
+from insightpulse.observability.alerting import get_alert_manager
+from insightpulse.observability.metrics import get_metrics_collector
+from insightpulse.observability.tracing import trace_agent
 
 logger = structlog.get_logger(__name__)
 
@@ -150,16 +153,27 @@ def build_survey_pipeline() -> StateGraph:
     workflow = StateGraph(SurveyPipelineState)
 
     # -----------------------------------------------------------------------
-    # Add agent nodes
+    # Add agent nodes — each wrapped in a tracing span so one survey run
+    # renders as one distributed trace with a child span per agent.
     # -----------------------------------------------------------------------
-    workflow.add_node("survey_designer", survey_designer_node)
-    workflow.add_node("cohort_selector", cohort_selector_node)
-    workflow.add_node("twin_orchestrator", twin_orchestrator_node)
-    workflow.add_node("validator", validator_node)
-    workflow.add_node("cost_check", cost_agent_node)
-    workflow.add_node("calibration_agent", calibration_agent_node)
-    workflow.add_node("diversity_monitor", diversity_monitor_node)
-    workflow.add_node("audit_agent", audit_agent_node)
+    workflow.add_node(
+        "survey_designer", trace_agent("SurveyDesigner")(survey_designer_node)
+    )
+    workflow.add_node(
+        "cohort_selector", trace_agent("CohortSelector")(cohort_selector_node)
+    )
+    workflow.add_node(
+        "twin_orchestrator", trace_agent("TwinOrchestrator")(twin_orchestrator_node)
+    )
+    workflow.add_node("validator", trace_agent("Validator")(validator_node))
+    workflow.add_node("cost_check", trace_agent("CostAgent")(cost_agent_node))
+    workflow.add_node(
+        "calibration_agent", trace_agent("CalibrationAgent")(calibration_agent_node)
+    )
+    workflow.add_node(
+        "diversity_monitor", trace_agent("DiversityMonitor")(diversity_monitor_node)
+    )
+    workflow.add_node("audit_agent", trace_agent("AuditAgent")(audit_agent_node))
 
     # -----------------------------------------------------------------------
     # Define edges (the DAG structure)
@@ -240,6 +254,8 @@ async def run_survey(
         Final pipeline state dictionary containing all results,
         metrics, and audit trace.
     """
+    import time
+
     initial_state = {
         "raw_questions": questions,
         "requested_cohort_size": cohort_size,
@@ -260,9 +276,18 @@ async def run_survey(
     pipeline = build_survey_pipeline()
     compiled = pipeline.compile()
 
-    result = await compiled.ainvoke(initial_state)
+    collector = get_metrics_collector()
+    collector.survey_run_started()
+    start = time.perf_counter()
+    try:
+        result = await compiled.ainvoke(initial_state)
+    finally:
+        collector.survey_run_finished()
+    duration_seconds = time.perf_counter() - start
 
     result["status"] = "completed" if not result.get("error_message") else "failed"
+
+    _record_run_metrics(result, initial_state, duration_seconds)
 
     logger.info(
         "survey_run_completed",
@@ -272,3 +297,41 @@ async def run_survey(
     )
 
     return result
+
+
+def _record_run_metrics(
+    result: dict[str, Any],
+    initial_state: dict[str, Any],
+    duration_seconds: float,
+) -> None:
+    """Record run-level metrics and evaluate alert rules (O11y hook).
+
+    Args:
+        result: Final pipeline state.
+        initial_state: The state the run started from.
+        duration_seconds: End-to-end pipeline duration.
+    """
+    models = initial_state.get("requested_models") or ["default"]
+    hallucination_rate = float(result.get("hallucination_rate", 0.0))
+
+    collector = get_metrics_collector()
+    collector.record_survey_run(
+        model=models[0],
+        status="success" if result["status"] == "completed" else "failed",
+        client=(result.get("metadata") or {}).get("client_name", "internal"),
+        duration_seconds=duration_seconds,
+        cohort_size=int(initial_state.get("requested_cohort_size", 0)),
+    )
+    collector.set_hallucination_rate(hallucination_rate)
+
+    # Alert rules are evaluated on run metrics as they land; the manager
+    # owns firing/cooldown state so repeated breaches page exactly once.
+    alert_manager = get_alert_manager()
+    alert_manager.evaluate("hallucination_rate_critical", hallucination_rate)
+    security_meta = (result.get("generation_metadata") or {}).get(
+        "security_flags", {}
+    )
+    alert_manager.evaluate(
+        "prompt_injection_high_risk",
+        bool(security_meta.get("questions_blocked", 0)),
+    )

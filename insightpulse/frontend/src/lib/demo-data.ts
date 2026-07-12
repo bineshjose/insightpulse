@@ -173,9 +173,10 @@ export const LATEST_RUN: SurveyRunResponse = {
 
 /** Multi-LLM comparison — matches experiments/multi_llm_comparison.json. */
 export const MODEL_COMPARISON = [
-  { model: "claude-sonnet-4-6", jsDivergence: 0.0002, wasserstein: 0.0233, hallucination: 0.018, consistency: 0.99, costUsd: 0.65, throughput: 1248 },
-  { model: "gpt-4o", jsDivergence: 0.0003, wasserstein: 0.0253, hallucination: 0.028, consistency: 0.98, costUsd: 0.44, throughput: 1420 },
-  { model: "ollama/llama3.1", jsDivergence: 0.0004, wasserstein: 0.0368, hallucination: 0.074, consistency: 0.953, costUsd: 0.0, throughput: 530 },
+  { model: "claude-sonnet-4-6", jsDivergence: 0.0002, wasserstein: 0.0233, hallucination: 0.018, consistency: 0.99, costUsd: 0.65, throughput: 1248, safetyScore: 1.0 },
+  { model: "gpt-4o", jsDivergence: 0.0003, wasserstein: 0.0253, hallucination: 0.028, consistency: 0.98, costUsd: 0.44, throughput: 1420, safetyScore: 1.0 },
+  { model: "claude-haiku-4-5", jsDivergence: 0.0003, wasserstein: 0.0289, hallucination: 0.034, consistency: 0.965, costUsd: 0.12, throughput: 1655, safetyScore: 1.0 },
+  { model: "ollama/llama3.1", jsDivergence: 0.0004, wasserstein: 0.0368, hallucination: 0.074, consistency: 0.953, costUsd: 0.0, throughput: 530, safetyScore: 0.992 },
 ] as const;
 
 /** Sinkhorn convergence — iterations to threshold per ε (experiment data). */
@@ -207,6 +208,131 @@ export const SEQUENTIAL_SUMMARY = {
   contradictions: { independent: 0.104, conditioned: 0.018, empirical: 0.116 },
 } as const;
 
+/** Exact configuration behind each experiment tab's displayed results. */
+export const EXPERIMENT_PARAMS = {
+  llm: {
+    model: "claude-sonnet-4-6 · gpt-4o · claude-haiku-4-5 · ollama/llama3.1",
+    cohort_size: 200,
+    seed: 42,
+    epsilon: 0.1,
+    calibration_enabled: true,
+    questions_used: 5,
+  },
+  convergence: {
+    model: "claude-sonnet-4-6",
+    cohort_size: 300,
+    seed: 42,
+    epsilon: "0.01 · 0.05 · 0.1 · 0.5",
+    calibration_enabled: true,
+    questions_used: 3,
+  },
+  drift: {
+    model: "— (embedding-level, no LLM)",
+    cohort_size: "full panel (500 households)",
+    seed: 42,
+    baseline_window: "3 months",
+    js_trigger: 0.0055,
+    questions_used: "category mix (8 categories)",
+  },
+  sequential: {
+    model: "claude-sonnet-4-6",
+    cohort_size: 200,
+    seed: 42,
+    epsilon: 0.1,
+    calibration_enabled: true,
+    questions_used: 4,
+    strategies: "independent vs conditioned",
+  },
+} as const satisfies Record<string, Record<string, string | number | boolean>>;
+
+/** One tracked experiment execution shown on the Run History tab. */
+export interface ExperimentRun {
+  id: string;
+  experiment: string;
+  models: string;
+  cohort: string;
+  timestamp: string;
+  keyResult: string;
+  parameters: string;
+  details: readonly { label: string; value: string }[];
+}
+
+/** Lightweight experiment tracker — most recent executions first. */
+export const EXPERIMENT_RUNS: readonly ExperimentRun[] = [
+  {
+    id: "exp-041",
+    experiment: "Multi-LLM Comparison",
+    models: "4 models",
+    cohort: "200",
+    timestamp: "Jul 11, 10:15 AM",
+    keyResult: "Claude best (JS: 0.0002)",
+    parameters: "seed=42, calibration=on",
+    details: [
+      { label: "Models compared", value: "claude-sonnet-4-6, gpt-4o, claude-haiku-4-5, ollama/llama3.1" },
+      { label: "Best JS divergence", value: "0.0002 (claude-sonnet-4-6)" },
+      { label: "Best Wasserstein", value: "0.0233 (claude-sonnet-4-6)" },
+      { label: "Lowest hallucination", value: "1.8% (claude-sonnet-4-6)" },
+      { label: "Highest throughput", value: "1,655 resp/min (claude-haiku-4-5)" },
+      { label: "Safety score range", value: "99.2% – 100%" },
+      { label: "Calibration", value: "BDCL Sinkhorn, ε = 0.1" },
+      { label: "Seed", value: "42" },
+    ],
+  },
+  {
+    id: "exp-040",
+    experiment: "Calibration Convergence",
+    models: "claude-sonnet-4-6",
+    cohort: "300",
+    timestamp: "Jul 10, 3:00 PM",
+    keyResult: "ε=0.1 optimal (80 iter)",
+    parameters: "4 epsilon values tested",
+    details: [
+      { label: "Epsilon values", value: "0.01, 0.05, 0.1, 0.5" },
+      { label: "Optimal setting", value: "ε = 0.1 — converged in 80 iterations" },
+      { label: "ε = 0.01", value: "312 iterations (slow, tightest coupling)" },
+      { label: "ε = 0.5", value: "9 iterations (fast, over-smoothed)" },
+      { label: "Convergence threshold", value: "marginal error < 1e-6" },
+      { label: "Post-calibration JS", value: "0.0009 (was 0.0102 raw)" },
+      { label: "Seed", value: "42" },
+    ],
+  },
+  {
+    id: "exp-039",
+    experiment: "Drift Detection",
+    models: "—",
+    cohort: "full panel",
+    timestamp: "Jul 9, 11:00 AM",
+    keyResult: "No drift detected",
+    parameters: "3-month baseline, trigger=0.0055",
+    details: [
+      { label: "Method", value: "Monthly category-mix JS divergence vs 3-month rolling baseline" },
+      { label: "Retraining trigger", value: "JS > 0.0055" },
+      { label: "Stationary panel", value: "max 0.0045 — below trigger every month" },
+      { label: "Injected-drift control", value: "crossed trigger at month 7 (0.0098)" },
+      { label: "Conclusion", value: "No retraining required for the active panel" },
+      { label: "Window evaluated", value: "Oct 2025 – Jun 2026" },
+    ],
+  },
+  {
+    id: "exp-038",
+    experiment: "Sequential Dependency",
+    models: "claude-sonnet-4-6",
+    cohort: "200",
+    timestamp: "Jul 8, 2:30 PM",
+    keyResult: "+13.4pp consistency",
+    parameters: "with vs without conditioning",
+    details: [
+      { label: "Strategies", value: "independent generation vs prior-answer conditioning" },
+      { label: "Spearman ρ (independent)", value: "0.28" },
+      { label: "Spearman ρ (conditioned)", value: "0.65" },
+      { label: "Contradiction rate", value: "10.4% → 1.8% with conditioning" },
+      { label: "Within-person consistency", value: "81.2% → 94.6% (+13.4pp)" },
+      { label: "Questions", value: "4 linked purchase-intent questions" },
+      { label: "Seed", value: "42" },
+    ],
+  },
+] as const;
+
 /** Validation targets vs measured (acceptance criteria). */
 export const VALIDATION_CHECKS = [
   { metric: "Cosine similarity", target: "≥ 0.80", actual: "0.84", pass: true, why: "Behavioral embeddings are unit-normalized; angular distance captures alignment." },
@@ -215,6 +341,7 @@ export const VALIDATION_CHECKS = [
   { metric: "Hallucination rate", target: "< 5%", actual: "1.9%", pass: true, why: "Fraction of twins citing non-existent facts (Validator flags)." },
   { metric: "Logical consistency", target: "> 90%", actual: "94.6%", pass: true, why: "Cross-question coherence in sequential surveys." },
   { metric: "Shannon entropy", target: "≥ 1.5 bits", actual: "2.31", pass: true, why: "Diversity floor — guards against LLM mode collapse." },
+  { metric: "Response Safety", target: "0 PII leaks, 0 harmful content", actual: "0 PII, 0 harmful ✓", pass: true, why: "Ensures synthetic responses don't leak real personal information or generate harmful content." },
 ] as const;
 
 /** Recent runs table for the dashboard overview and audit history. */

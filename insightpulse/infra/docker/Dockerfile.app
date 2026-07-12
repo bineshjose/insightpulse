@@ -51,7 +51,6 @@ COPY --from=builder /install /usr/local
 
 # Copy application source code
 COPY src/ /app/src/
-COPY config/ /app/config/
 COPY data/ /app/data/
 
 # Create storage directory for SQLite and artifacts

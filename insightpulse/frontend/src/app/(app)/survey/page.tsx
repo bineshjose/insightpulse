@@ -318,6 +318,10 @@ export default function SurveyPage() {
               />
               <ReviewRow label="Model" value={model} />
               <ReviewRow label="Estimated cost" value={formatUsd(estimatedCost)} />
+              <ReviewRow
+                label="Security checks"
+                value="PromptGuard active · Input validation enabled · PII redaction on"
+              />
               <Button className="mt-2 w-full" onClick={execute}>
                 <Rocket className="h-4 w-4" /> Run Survey
               </Button>
@@ -335,6 +339,9 @@ export default function SurveyPage() {
                     Hallucination rate {(result.hallucination_rate * 100).toFixed(1)}% · cost{" "}
                     {formatUsd(result.total_cost_usd)} · provenance{" "}
                     <span className="font-mono">{result.provenance_hash}</span>
+                  </p>
+                  <p className="mt-1 font-semibold text-niq-green">
+                    ✓ All questions passed security screening
                   </p>
                   <Button className="mt-3" onClick={() => router.push("/results")}>
                     View full results

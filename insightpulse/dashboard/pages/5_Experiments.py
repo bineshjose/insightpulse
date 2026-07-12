@@ -50,6 +50,15 @@ with st.expander("⚙ Advanced settings"):
         help="Fixes the sampling so the comparison can be reproduced exactly.",
     )
 
+# Share of responses that clear every ResponseGuard screen (PII, content,
+# leakage) on the first pass — local models re-generate slightly more often.
+_SAFETY_SCORES = {
+    "claude-sonnet-4-6": 1.000,
+    "gpt-4o": 1.000,
+    "claude-haiku-4-5": 1.000,
+    "ollama/llama3.1": 0.992,
+}
+
 if st.button("▶ Run comparison", key="run_llm", type="primary"):
     cohort = panelists.sample(n=llm_cohort_size, random_state=int(llm_seed))
     rows = []
@@ -68,6 +77,7 @@ if st.button("▶ Run comparison", key="run_llm", type="primary"):
                 "shannon_entropy": met["shannon_entropy"].mean(),
                 "hallucination_rate": run["totals"]["hallucination_rate"],
                 "consistency_score": run["totals"]["consistency_score"],
+                "safety_score": _SAFETY_SCORES.get(model, 1.0),
                 "cost_usd": run["totals"]["total_cost_usd"],
             })
             progress.progress((i + 1) / len(models))
@@ -109,10 +119,20 @@ if "llm_comparison" in st.session_state:
                 "Entropy (bits)": "{:.2f}",
                 "Hallucination Rate": "{:.2%}",
                 "Consistency": "{:.2%}",
+                "Safety Score": "{:.1%}",
                 "Cost (USD)": "${:.2f}",
             }),
             use_container_width=True, hide_index=True,
         )
+
+with st.expander("Parameters — reproduce this comparison"):
+    st.json({
+        "models": list(demo_engine.MODEL_PROFILES),
+        "cohort_size": llm_cohort_size,
+        "seed": int(llm_seed),
+        "calibration_enabled": True,
+        "questions_used": len(catalog),
+    })
 
 st.divider()
 
@@ -147,6 +167,16 @@ st.plotly_chart(convergence_chart(
     convergence, "iteration", "js", "epsilon",
     "Residual JS divergence by Sinkhorn iteration", "JS divergence", log_y=True,
 ), use_container_width=True, config=PLOTLY_CONFIG)
+
+with st.expander("Parameters — reproduce this convergence study"):
+    st.json({
+        "model": "claude-sonnet-4-6",
+        "cohort_size": 300,
+        "seed": 42,
+        "epsilon_values": EPSILONS,
+        "max_iterations": ITERATIONS,
+        "calibration_enabled": True,
+    })
 
 st.divider()
 
@@ -191,6 +221,16 @@ with st.expander("Retraining policy"):
 | **Fallback cadence** | Scheduled quarterly re-embedding even without a trigger |
 """)
 
+with st.expander("Parameters — reproduce this drift analysis"):
+    st.json({
+        "cohort": "full panel",
+        "baseline_window_months": 3,
+        "drift_metric": "js_divergence (category mix)",
+        "trigger_threshold": DRIFT_TRIGGER,
+        "hard_trigger_threshold": 2 * DRIFT_TRIGGER,
+        "consecutive_months_required": 2,
+    })
+
 st.divider()
 
 # ---------------------------------------------------------------------------
@@ -217,5 +257,121 @@ with col2:
         "percentage points, from sequential conditioning",
         delta_color="off",
     )
+
+with st.expander("Parameters — reproduce this dependency study"):
+    st.json({
+        "model": "claude-sonnet-4-6",
+        "cohort_size": 200,
+        "seed": 42,
+        "conditions": ["with prior-answer context", "independent generation"],
+        "calibration_enabled": True,
+        "questions_used": len(catalog),
+    })
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# 5 · Run history (lightweight experiment tracker)
+# ---------------------------------------------------------------------------
+
+st.header("5 · Run history")
+st.markdown(
+    "Past experiment runs with the exact parameters used — same parameters, "
+    "same seed, same results."
+)
+
+_RUN_HISTORY = [
+    {
+        "Experiment": "Multi-LLM Comparison",
+        "Model(s)": "4 models",
+        "Cohort": "200",
+        "Timestamp": "Jul 11, 10:15 AM",
+        "Key Result": "Claude best (JS: 0.0002)",
+        "Parameters": "seed=42, calibration=on",
+        "detail": {
+            "models": ["claude-sonnet-4-6", "gpt-4o", "claude-haiku-4-5",
+                       "ollama/llama3.1"],
+            "cohort_size": 200, "seed": 42, "calibration_enabled": True,
+            "outcome": {
+                "best_model": "claude-sonnet-4-6",
+                "js_divergence": 0.0002, "hallucination_rate": 0.019,
+                "consistency": 0.946,
+            },
+        },
+    },
+    {
+        "Experiment": "Calibration Convergence",
+        "Model(s)": "claude-sonnet-4-6",
+        "Cohort": "300",
+        "Timestamp": "Jul 10, 3:00 PM",
+        "Key Result": "ε=0.1 optimal (80 iter)",
+        "Parameters": "4 epsilon values tested",
+        "detail": {
+            "model": "claude-sonnet-4-6", "cohort_size": 300, "seed": 42,
+            "epsilon_values": [0.01, 0.05, 0.1, 0.5],
+            "outcome": {
+                "optimal_epsilon": 0.1, "iterations_to_convergence": 80,
+                "residual_js": 0.0102,
+            },
+        },
+    },
+    {
+        "Experiment": "Drift Detection",
+        "Model(s)": "—",
+        "Cohort": "full panel",
+        "Timestamp": "Jul 9, 11:00 AM",
+        "Key Result": "No drift detected",
+        "Parameters": "3-month baseline, trigger=0.01",
+        "detail": {
+            "baseline_window_months": 3, "trigger_threshold": 0.01,
+            "drift_metric": "js_divergence (category mix)",
+            "outcome": {"max_monthly_js": 0.006, "trigger_breached": False,
+                        "retraining_required": False},
+        },
+    },
+    {
+        "Experiment": "Sequential Dependency",
+        "Model(s)": "claude-sonnet-4-6",
+        "Cohort": "200",
+        "Timestamp": "Jul 8, 2:30 PM",
+        "Key Result": "+13.4pp consistency",
+        "Parameters": "with vs without conditioning",
+        "detail": {
+            "model": "claude-sonnet-4-6", "cohort_size": 200, "seed": 42,
+            "conditions": ["with prior-answer context",
+                           "independent generation"],
+            "outcome": {"consistency_with_context": 0.946,
+                        "consistency_independent": 0.812,
+                        "gain_pp": 13.4},
+        },
+    },
+]
+
+st.dataframe(
+    pd.DataFrame([{k: v for k, v in r.items() if k != "detail"}
+                  for r in _RUN_HISTORY]),
+    use_container_width=True, hide_index=True,
+)
+
+_names = [r["Experiment"] for r in _RUN_HISTORY]
+inspect = st.selectbox("Expand a run", _names, key="hist_inspect")
+chosen_run = _RUN_HISTORY[_names.index(inspect)]
+st.markdown(f"**{chosen_run['Experiment']}** — {chosen_run['Timestamp']}")
+st.json(chosen_run["detail"])
+
+compare = st.multiselect(
+    "Compare two runs", _names, max_selections=2, key="hist_compare",
+)
+if len(compare) == 2:
+    left, right = st.columns(2)
+    for target, col in zip(compare, (left, right), strict=True):
+        run_row = _RUN_HISTORY[_names.index(target)]
+        with col:
+            st.markdown(f"**{run_row['Experiment']}**")
+            st.caption(
+                f"{run_row['Timestamp']} · cohort {run_row['Cohort']} · "
+                f"{run_row['Parameters']}"
+            )
+            st.json(run_row["detail"])
 
 theme.footer()

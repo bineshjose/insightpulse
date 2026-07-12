@@ -3,7 +3,7 @@
 Settings are loaded in order of precedence (highest first):
 1. Environment variables (e.g., ANTHROPIC_API_KEY)
 2. .env file
-3. Profile-specific YAML (config/profiles/{ENV}.yaml)
+3. Profile-specific YAML (src/insightpulse/config/profiles/{ENV}.yaml)
 4. Defaults defined in this module
 
 This ensures the same codebase runs across demo, production, and test
@@ -293,6 +293,92 @@ class ETLConfig(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
+# Security Configuration (prompt guard, response guard, auth, validation)
+# ---------------------------------------------------------------------------
+
+class SecurityConfig(BaseSettings):
+    """Security layer tuning: prompt guard, PII redaction, auth, and limits.
+
+    Every threshold the security package enforces lives here so that
+    operational tuning (tightening a pattern list, rotating a secret,
+    changing a rate limit) never requires a code change.
+    """
+
+    # --- PromptGuard ---
+    # Maximum characters accepted for any single prompt/question input.
+    prompt_max_length: int = Field(default=2000, ge=100)
+    # Approximate token budget for a constructed persona prompt.
+    max_prompt_tokens: int = Field(default=4096, ge=128)
+    # Enable base64/hex/unicode obfuscation detection.
+    encoding_detection_enabled: bool = True
+    # Minimum decoded-payload length before an encoding hit is flagged.
+    min_encoded_payload_length: int = Field(default=16, ge=4)
+
+    # --- ResponseGuard ---
+    pii_redaction_enabled: bool = True
+    harmful_content_detection_enabled: bool = True
+
+    # --- JWT / API auth ---
+    jwt_secret: SecretStr = SecretStr("insightpulse-demo-signing-key")
+    jwt_algorithm: str = "HS256"
+    jwt_default_expiry_hours: int = Field(default=24, ge=1)
+
+    # --- Rate limits (per user, sliding window) ---
+    rate_limit_survey_per_minute: int = Field(default=100, ge=1)
+    rate_limit_read_per_minute: int = Field(default=1000, ge=1)
+
+    # --- Input validation ---
+    max_survey_name_length: int = Field(default=200, ge=1)
+    contract_id_pattern: str = r"^NIQ-[A-Z]{3}-[0-9]{4}-Q[1-4]-[0-9]{3}$"
+    allowed_models: list[str] = Field(
+        default_factory=lambda: [
+            "claude-sonnet-4-6",
+            "gpt-4o",
+            "claude-haiku-4-5",
+            "ollama/llama3.1",
+        ]
+    )
+    known_clients: list[str] = Field(
+        default_factory=lambda: [
+            "Unilever",
+            "Procter & Gamble",
+            "Nestlé",
+            "PepsiCo",
+            "Coca-Cola",
+            "Kraft Heinz",
+            "Mondelez",
+            "Danone",
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Observability Configuration (metrics, tracing, health, alerting)
+# ---------------------------------------------------------------------------
+
+class ObservabilityConfig(BaseSettings):
+    """Observability tuning: metrics, tracing, health checks, alert rules."""
+
+    metrics_enabled: bool = True
+    tracing_enabled: bool = True
+    # Trace exporter: console (demo) | azure_monitor | jaeger.
+    tracing_exporter: str = "console"
+
+    # Health check budget per component probe.
+    health_check_timeout_seconds: float = Field(default=5.0, ge=0.1)
+
+    # --- Alert rule thresholds ---
+    hallucination_alert_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
+    hallucination_consecutive_runs: int = Field(default=3, ge=1)
+    llm_error_rate_threshold: float = Field(default=0.20, ge=0.0, le=1.0)
+    calibration_nonconvergence_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
+    budget_warning_utilization: float = Field(default=0.80, ge=0.0, le=1.0)
+    latency_p95_threshold_seconds: float = Field(default=30.0, ge=0.0)
+    throughput_drop_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
+    default_alert_cooldown_minutes: int = Field(default=15, ge=0)
+
+
+# ---------------------------------------------------------------------------
 # Main Settings
 # ---------------------------------------------------------------------------
 
@@ -365,6 +451,8 @@ class Settings(BaseSettings):
     adls: ADLSConfig = ADLSConfig()
     redis_cache: RedisCacheConfig = RedisCacheConfig()
     etl: ETLConfig = ETLConfig()
+    security: SecurityConfig = SecurityConfig()
+    observability: ObservabilityConfig = ObservabilityConfig()
 
     @field_validator("log_level")
     @classmethod
@@ -395,7 +483,7 @@ def _load_profile_yaml(env: str) -> dict[str, Any]:
         Dictionary of settings from the YAML file, or empty dict if
         the file doesn't exist.
     """
-    profile_path = Path("config/profiles") / f"{env}.yaml"
+    profile_path = Path(__file__).parent / "profiles" / f"{env}.yaml"
     if profile_path.exists():
         with open(profile_path) as f:
             return yaml.safe_load(f) or {}

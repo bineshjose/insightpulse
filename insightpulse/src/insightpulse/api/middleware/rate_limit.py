@@ -30,8 +30,12 @@ from insightpulse.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Paths that must never be throttled (probes, docs discovery).
-_EXEMPT_PATHS = frozenset({"/health", "/docs", "/openapi.json"})
+# Paths that must never be throttled: kubelet probes, the Prometheus
+# scraper, and docs discovery.
+_EXEMPT_PATHS = frozenset({
+    "/health", "/health/ready", "/health/live", "/metrics",
+    "/docs", "/openapi.json",
+})
 
 
 class SlidingWindowRateLimiter(BaseHTTPMiddleware):

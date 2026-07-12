@@ -1,0 +1,150 @@
+# Prometheus alerting rules for InsightPulse.
+#
+# Mirrors the in-process rule set in src/insightpulse/observability/alerting.py
+# so that alerts fire identically whether evaluated by the application
+# (structlog/webhook notifications) or by the cluster Prometheus.
+#
+# Deploy with kube-prometheus-stack:
+#   kubectl apply -f rules.yaml   (wrapped in a PrometheusRule CR — see README.md)
+# or mount into a vanilla Prometheus under rule_files.
+
+groups:
+  - name: insightpulse.critical
+    rules:
+      - alert: HallucinationRateCritical
+        # Gauge is set after every survey run; "for: 15m" approximates the
+        # "3 consecutive runs" requirement at the expected run cadence.
+        expr: hallucination_rate_current_ratio > 0.10
+        for: 15m
+        labels:
+          severity: critical
+          service: insightpulse
+        annotations:
+          summary: "Hallucination rate above 10% on recent survey runs"
+          description: >-
+            The hallucination rate of recent survey runs is
+            {{ $value | humanizePercentage }} (threshold 10%). Responses may
+            contradict panelist purchase history. Pause client deliveries and
+            follow the runbook in docs/observability.md.
+
+      - alert: LLMAPIErrorRateCritical
+        expr: >-
+          sum(rate(llm_calls_total{status="error"}[5m]))
+            /
+          sum(rate(llm_calls_total[5m])) > 0.20
+        for: 5m
+        labels:
+          severity: critical
+          service: insightpulse
+        annotations:
+          summary: "LLM API error rate above 20% in the last 5 minutes"
+          description: >-
+            {{ $value | humanizePercentage }} of LLM calls are failing.
+            Check provider status pages, credentials, and the circuit
+            breaker state; consider failing over the default model.
+
+      - alert: PromptInjectionHighRisk
+        expr: >-
+          increase(prompt_injection_detected_total{risk_level=~"high|critical"}[5m]) > 0
+        labels:
+          severity: critical
+          service: insightpulse
+        annotations:
+          summary: "HIGH/CRITICAL risk prompt injection attempt detected"
+          description: >-
+            The PromptGuard blocked a high-risk injection attempt. Review the
+            audit log for the offending request and client, and confirm the
+            block held (no anomalous responses generated afterwards).
+
+  - name: insightpulse.warning
+    rules:
+      - alert: CalibrationNonConvergenceHigh
+        expr: >-
+          sum(increase(calibration_runs_total{converged="false"}[1h]))
+            /
+          sum(increase(calibration_runs_total[1h])) > 0.30
+        for: 10m
+        labels:
+          severity: warning
+          service: insightpulse
+        annotations:
+          summary: "BDCL calibration non-convergence rate above 30%"
+          description: >-
+            {{ $value | humanizePercentage }} of Sinkhorn calibration runs
+            failed to converge in the last hour. Inspect epsilon settings and
+            input distribution shapes (see the runbook).
+
+      - alert: BudgetUtilizationHigh
+        # 50 USD is the default monthly LLM budget; adjust the constant to
+        # the contracted budget when it changes.
+        expr: sum(total_cost_usd_accumulated) > (0.80 * 50)
+        labels:
+          severity: warning
+          service: insightpulse
+        annotations:
+          summary: "LLM spend above 80% of the monthly budget"
+          description: >-
+            Accumulated LLM spend is {{ $value | humanize }} USD, past 80% of
+            the monthly budget. The CostAgent will begin throttling; review
+            per-model spend and consider routing to claude-haiku-4-5.
+
+      - alert: DataQualityCriticalFailure
+        expr: >-
+          increase(validation_checks_total{check_type="data_quality",result="critical_failure"}[15m]) > 0
+        labels:
+          severity: warning
+          service: insightpulse
+        annotations:
+          summary: "Data quality check failed at CRITICAL severity"
+          description: >-
+            An ETL data-quality gate reported a CRITICAL failure. The load
+            was halted before promotion; inspect the ETL logs for the failing
+            check and source table.
+
+      - alert: SurveyLatencyP95High
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum(rate(api_request_duration_seconds_bucket{endpoint="/api/v1/survey/run"}[10m])) by (le)
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+          service: insightpulse
+        annotations:
+          summary: "Survey run latency p95 above 30s"
+          description: >-
+            p95 latency for /api/v1/survey/run is {{ $value | humanize }}s.
+            Check LLM provider latency, concurrency saturation
+            (active_survey_runs), and HPA headroom.
+
+  - name: insightpulse.info
+    rules:
+      - alert: BehavioralDriftAboveTrigger
+        expr: >-
+          increase(validation_checks_total{check_type="behavioral_drift",result="triggered"}[1h]) > 0
+        labels:
+          severity: info
+          service: insightpulse
+        annotations:
+          summary: "Behavioral drift above the retraining trigger"
+          description: >-
+            The DiversityMonitor detected embedding drift beyond the
+            retraining trigger. Schedule an encoder retraining run; twins
+            remain usable but fidelity will decay over time.
+
+      - alert: SurveyThroughputDrop
+        expr: >-
+          sum(rate(survey_runs_total[1h]))
+            <
+          0.50 * sum(rate(survey_runs_total[7d]))
+        for: 30m
+        labels:
+          severity: info
+          service: insightpulse
+        annotations:
+          summary: "Survey throughput dropped more than 50% vs the 7-day average"
+          description: >-
+            Hourly survey throughput is under half the 7-day average. Verify
+            this is expected (weekend, planned pause) rather than a silent
+            upstream failure in scheduling or ingestion.

@@ -64,7 +64,11 @@ pages = [
         icon=":material/receipt_long:", url_path="audit",
     ),
     st.Page(
-        "pages/8_Profile.py", title="Profile",
+        "pages/8_Operations.py", title="Operations",
+        icon=":material/settings_suggest:", url_path="operations",
+    ),
+    st.Page(
+        "pages/9_Profile.py", title="Profile",
         icon=":material/account_circle:", url_path="profile",
     ),
 ]

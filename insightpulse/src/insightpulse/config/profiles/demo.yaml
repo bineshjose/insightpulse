@@ -2,14 +2,14 @@
 # InsightPulse — Demo Profile
 # =============================================================================
 # Lightweight settings for running on a personal laptop with Docker Desktop.
-# Uses synthetic data, SQLite, and in-memory caching.
+# Uses generated demo data, SQLite, and in-memory caching.
 # =============================================================================
 
 env: demo
 debug: true
 log_level: DEBUG
 
-data_source: synthetic
+data_source: demo
 cache_backend: memory
 database_url: "sqlite+aiosqlite:///app/storage/insightpulse.db"
 

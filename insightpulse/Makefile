@@ -72,7 +72,7 @@ etl-quality: ## Run the data quality gate against the active panel
 data-explore: ## Print the EDA summary for the active panel
 	python -c "import pandas as pd; from insightpulse.analytics.eda import PanelistAnalyzer, PurchaseAnalyzer; print(PanelistAnalyzer(pd.read_csv('data/demo/panelists.csv')).summary()); print(PurchaseAnalyzer(pd.read_csv('data/demo/purchases.csv')).summary())"
 
-generate-data: ## Generate synthetic sample data for demo mode
+generate-data: ## Generate demo panel data (500 households, 10K purchases)
 	python -m data.demo.generate_sample_data
 
 # --- Experiments ---

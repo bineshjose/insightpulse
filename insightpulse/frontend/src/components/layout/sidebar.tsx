@@ -9,7 +9,9 @@ import {
   ClipboardList,
   FlaskConical,
   LayoutDashboard,
+  Lock,
   ScanSearch,
+  Server,
   ShieldCheck,
   Target,
   User as UserIcon,
@@ -57,6 +59,12 @@ const NAV_ITEMS: readonly {
     label: "Audit",
     icon: ClipboardList,
     roles: ["Platform Administrator", "Read-Only Evaluator"],
+  },
+  {
+    href: "/operations",
+    label: "Operations",
+    icon: Server,
+    roles: ["Platform Administrator"],
   },
   { href: "/profile", label: "Profile", icon: UserIcon, roles: null },
 ];
@@ -107,6 +115,34 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {user && (
+        <div
+          className={cn(
+            "space-y-1.5 border-t border-white/20 px-3 py-2.5 text-xs font-semibold text-white/80",
+            collapsed && "flex flex-col items-center",
+          )}
+        >
+          <div className="flex items-center gap-2" title="PromptGuard: Active">
+            <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-niq-green" />
+            {!collapsed && (
+              <span className="flex items-center gap-1">
+                <Lock className="h-3 w-3" /> PromptGuard: Active
+              </span>
+            )}
+          </div>
+          {user.role === "Platform Administrator" && (
+            <Link
+              href="/operations"
+              title="System: Healthy"
+              className="flex items-center gap-2 hover:text-white"
+            >
+              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-niq-green" />
+              {!collapsed && <span>System: Healthy</span>}
+            </Link>
+          )}
+        </div>
+      )}
 
       {user && (
         <div className="border-t border-white/20 p-3">

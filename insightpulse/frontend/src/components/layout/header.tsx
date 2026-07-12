@@ -17,11 +17,13 @@ import { formatNumber } from "@/lib/utils";
 
 const CRUMB_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
+  "data-explorer": "Data Explorer",
   survey: "Survey Runner",
   results: "Results",
   experiments: "Experiments",
   validation: "Validation",
   audit: "Audit",
+  operations: "Operations",
   profile: "Profile",
 };
 

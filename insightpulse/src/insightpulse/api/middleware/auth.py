@@ -16,7 +16,10 @@ from insightpulse.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_EXEMPT_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+_EXEMPT_PATHS = {
+    "/health", "/health/ready", "/health/live", "/metrics",
+    "/docs", "/openapi.json", "/redoc",
+}
 
 
 class APIKeyAuthMiddleware(BaseHTTPMiddleware):
@@ -62,3 +65,73 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Invalid or missing API key"},
             )
         return await call_next(request)
+
+
+class ProductionAuthMiddleware(BaseHTTPMiddleware):
+    """Require a valid JWT (Bearer) or API key on every /api/ endpoint.
+
+    Production-only enforcement (the demo profile never installs this
+    middleware — auth there is optional, rate limiting stays active).
+    Credential validation is delegated to the security layer's Strategy
+    implementations: :class:`insightpulse.security.JWTAuthenticator` and
+    :class:`insightpulse.security.APIKeyValidator`.
+    """
+
+    def __init__(self, app, api_key: str | None = None) -> None:
+        """Create the middleware.
+
+        Args:
+            app: Downstream ASGI application.
+            api_key: Accepted API key for the X-API-Key path (None means
+                only JWTs are accepted).
+        """
+        super().__init__(app)
+        # Local import: the security package must not be an import-time
+        # dependency of every middleware consumer (e.g. unit tests that
+        # exercise only rate limiting).
+        from insightpulse.security import APIKeyValidator, JWTAuthenticator
+
+        self._jwt = JWTAuthenticator()
+        self._api_key = APIKeyValidator(api_key)
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Enforce JWT-or-API-key on /api/ paths.
+
+        Args:
+            request: Incoming request.
+            call_next: Downstream handler.
+
+        Returns:
+            401 JSON response when neither credential validates, the
+            downstream response otherwise.
+        """
+        path = request.url.path
+        if not path.startswith("/api/") or path in _EXEMPT_PATHS:
+            return await call_next(request)
+
+        from insightpulse.security import AuthenticationError, TokenExpiredError
+
+        bearer = request.headers.get("Authorization", "")
+        if bearer.startswith("Bearer "):
+            try:
+                self._jwt.verify_token(bearer.removeprefix("Bearer ").strip())
+                return await call_next(request)
+            except (AuthenticationError, TokenExpiredError) as exc:
+                logger.warning(
+                    "jwt_rejected", path=path, reason=type(exc).__name__
+                )
+                return JSONResponse(
+                    status_code=401, content={"detail": str(exc)}
+                )
+
+        presented = request.headers.get("X-API-Key", "")
+        if presented and self._api_key.validate(presented):
+            return await call_next(request)
+
+        logger.warning("auth_missing", path=path)
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Authentication required: Bearer JWT or X-API-Key"},
+        )

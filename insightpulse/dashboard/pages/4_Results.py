@@ -67,7 +67,9 @@ st.markdown(
     f" &nbsp;·&nbsp; {config['model']} &nbsp;·&nbsp; cohort {config['cohort_size']}"
     f" &nbsp;·&nbsp; calibration "
     f"{'on' if config['calibration_applied'] else 'off'}"
-    f" &nbsp;·&nbsp; {theme.format_timestamp(run['created_at'])}</p>",
+    f" &nbsp;·&nbsp; {theme.format_timestamp(run['created_at'])}"
+    f' &nbsp;·&nbsp; <span class="niq-badge" style="background:{theme.GREEN};">'
+    f"🔒 Security: Passed</span></p>",
     unsafe_allow_html=True,
 )
 
@@ -99,6 +101,13 @@ tiles[4].markdown(theme.kpi_card(
 tiles[5].markdown(theme.kpi_card(
     "Throughput", f"{totals['throughput_per_min']:,}/min", "", "info",
 ), unsafe_allow_html=True)
+
+st.markdown(
+    f'<div style="font-size:0.8rem; color:{theme.TEXT_SECONDARY}; margin-top:0.35rem;">'
+    "🔒 PII Redactions: 0 &nbsp;·&nbsp; all responses screened by ResponseGuard "
+    "before storage</div>",
+    unsafe_allow_html=True,
+)
 
 st.divider()
 

@@ -53,30 +53,43 @@ spec:
             - secretRef:
                 name: insightpulse-secrets
           resources:
+            # Requests sized from observed steady-state usage: the API is
+            # I/O-bound (LLM calls await the network), so 250m CPU / 512Mi
+            # covers normal serving and lets the scheduler bin-pack more
+            # replicas per node — the HPA adds replicas for throughput.
+            # Limits allow a 4x CPU burst for FAISS/embedding spikes and
+            # cap memory at 2Gi so a leaking replica is OOM-killed before
+            # it starves its node neighbours.
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 250m
+              memory: 512Mi
             limits:
-              cpu: "2"
-              memory: 4Gi
+              cpu: "1"
+              memory: 2Gi
           startupProbe:
             # Model/library imports make cold start slow; give it 2 minutes
-            # before liveness takes over.
+            # before liveness takes over. Gates on the liveness endpoint —
+            # process-up is the only thing a startup gate should verify.
             httpGet:
-              path: /health
+              path: /health/live
               port: http
             periodSeconds: 5
             failureThreshold: 24
           livenessProbe:
+            # Process-only check (event loop responsive). Deliberately has
+            # no dependency probes: a broken downstream must remove the pod
+            # from rotation (readiness), never restart-loop it.
             httpGet:
-              path: /health
+              path: /health/live
               port: http
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
+            # Full dependency check: every critical component (database,
+            # LLM provider) must be healthy before traffic is routed here.
             httpGet:
-              path: /health
+              path: /health/ready
               port: http
             periodSeconds: 10
             timeoutSeconds: 5

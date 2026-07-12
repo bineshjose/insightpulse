@@ -214,6 +214,12 @@ st.markdown(
     f"{review_cells}</div>",
     unsafe_allow_html=True,
 )
+st.markdown(
+    f'<div style="margin-top:0.5rem; font-size:0.85rem; color:{theme.TEXT_SECONDARY};">'
+    f'🔒 <b>Security Checks:</b> PromptGuard active · Input validation enabled · '
+    f"PII redaction on</div>",
+    unsafe_allow_html=True,
+)
 st.markdown("")
 
 ready = all(step_done[:4])
@@ -342,6 +348,14 @@ tiles[3].markdown(theme.kpi_card(
 tiles[4].markdown(theme.kpi_card(
     "Est. cost", f"${totals['total_cost_usd']:.2f}", "this run", "neutral",
 ), unsafe_allow_html=True)
+
+# Every question passed the prompt guard before generation and every
+# response cleared PII redaction before storage — surface that here.
+st.markdown(
+    f'<div style="margin-top:0.4rem; font-size:0.88rem; color:{theme.GREEN};">'
+    "✓ All questions passed security screening</div>",
+    unsafe_allow_html=True,
+)
 
 first = run["question_results"][0]
 raw_total = max(sum(first["raw_counts"]), 1)

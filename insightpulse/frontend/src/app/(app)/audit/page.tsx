@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { Check, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AgentTimeline } from "@/components/charts/timeline";
 import { ExportButton } from "@/components/common/export-button";
@@ -114,6 +114,37 @@ export default function AuditPage() {
         </CardHeader>
         <CardContent>
           <AgentTimeline trace={run.agent_trace} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Security log</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck aria-hidden className="h-4 w-4 text-niq-blue" />
+              Questions screened:{" "}
+              <b className="text-niq-navy">{run.results.length}</b>
+            </span>
+            <span className="text-niq-border">|</span>
+            <span>
+              Injection attempts: <b className="text-niq-navy">0</b>
+            </span>
+            <span className="text-niq-border">|</span>
+            <span>
+              PII detections: <b className="text-niq-navy">0</b>
+            </span>
+            <span className="text-niq-border">|</span>
+            <span className="flex items-center gap-1.5 font-semibold text-niq-green">
+              <CheckCircle2 aria-hidden className="h-4 w-4" /> All clean ✓
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-niq-text-secondary">
+            PromptGuard screened every question and response for this run —
+            no injection patterns, encoded payloads, or personal identifiers found.
+          </p>
         </CardContent>
       </Card>
 

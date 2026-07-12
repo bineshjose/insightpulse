@@ -37,6 +37,14 @@ data/demo/*.npz
 # Docker
 storage/
 
+# Frontend build artifacts
+node_modules/
+.next/
+
+# Streamlit secrets & local assistant state
+.streamlit/secrets.toml
+.claude/
+
 # IDE
 .vscode/settings.json
 .idea/

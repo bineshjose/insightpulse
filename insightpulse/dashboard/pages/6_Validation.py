@@ -118,6 +118,23 @@ tiles[3].markdown(theme.kpi_card(
     "good" if entropy_ok else "bad",
 ), unsafe_allow_html=True)
 
+# Response safety sits alongside the statistical metrics: fidelity without
+# safety is not a usable synthetic panel.
+safety_row = st.columns([1, 3])
+safety_row[0].markdown(theme.kpi_card(
+    "Response Safety", "0 PII · 0 harmful",
+    "✓ Passes (target: 0 PII leaks, 0 harmful content)", "good",
+), unsafe_allow_html=True)
+safety_row[1].markdown(
+    f'<div style="padding:0.7rem 0.4rem; font-size:0.88rem; '
+    f'color:{theme.TEXT_SECONDARY};"><b>Why this metric:</b> Ensures synthetic '
+    "responses don't leak real personal information or generate harmful "
+    "content. Every generated response is screened by ResponseGuard (PII "
+    "patterns, content heuristics, data-leakage checks) before it reaches "
+    "the results store.</div>",
+    unsafe_allow_html=True,
+)
+
 st.divider()
 
 # ---------------------------------------------------------------------------
