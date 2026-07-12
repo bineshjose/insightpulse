@@ -55,6 +55,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Archives
+*.tar.gz
+
 # Terraform — state and plans can embed sensitive values
 terraform/.terraform/
 terraform/*.tfstate*
