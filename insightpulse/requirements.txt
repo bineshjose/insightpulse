@@ -1,0 +1,58 @@
+# ============================================================
+# InsightPulse — Requirements
+# M.Tech Thesis | CH24M521 | IIT Madras × NielsenIQ
+# Python 3.11.7
+# ============================================================
+
+# --- ML and Embeddings ---
+torch==2.2.0
+scikit-learn==1.4.0
+faiss-cpu==1.7.4
+
+# --- LLM and Agentic Orchestration ---
+langgraph==0.2.1
+litellm==1.35.0
+vllm==0.4.1
+
+# --- Optimal Transport (BDCL Calibration) ---
+POT==0.9.1
+
+# --- API Framework ---
+fastapi==0.139.0
+uvicorn==0.34.0
+pydantic==2.6.0
+
+# --- Data Access ---
+sqlalchemy==2.0.51
+alembic==1.15.2
+snowflake-connector-python==3.15.0
+psycopg2-binary==2.9.10
+redis==5.2.1
+azure-storage-blob==12.24.1
+
+# --- Frontend ---
+streamlit==1.45.1
+plotly==6.1.2
+
+# --- Observability ---
+prometheus-client==0.22.1
+opentelemetry-sdk==1.33.0
+opentelemetry-api==1.33.0
+opentelemetry-instrumentation-fastapi==0.50b0
+structlog==25.4.0
+
+# --- Security ---
+pyjwt==2.10.1
+cryptography==44.0.3
+
+# --- Testing ---
+pytest==8.4.1
+pytest-asyncio==1.0.0
+pytest-cov==6.1.1
+
+# --- Utilities ---
+numpy==1.26.4
+pandas==2.2.3
+pyyaml==6.0.2
+httpx==0.28.1
+python-dotenv==1.1.0
