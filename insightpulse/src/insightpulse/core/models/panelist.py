@@ -44,12 +44,16 @@ class IncomeGroup(StrEnum):
 
 
 class Region(StrEnum):
-    """Geographic region classification."""
+    """Geographic region classification (8 panel regions + settlement types)."""
 
     NORTHEAST = "northeast"
-    MIDWEST = "midwest"
+    MID_ATLANTIC = "mid_atlantic"
+    SOUTHEAST = "southeast"
     SOUTH = "south"
+    MIDWEST = "midwest"
+    MOUNTAIN = "mountain"
     WEST = "west"
+    PACIFIC = "pacific"
     URBAN = "urban"
     SUBURBAN = "suburban"
     RURAL = "rural"

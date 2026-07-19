@@ -42,9 +42,10 @@ class TransformerEmbeddingEngine(EmbeddingEngine):
     torch/faiss are imported lazily so demo deployments never load them
     (documented design decision — see module docstring). Encoder weights
     load from ``checkpoint_path`` when provided; otherwise seeded random
-    initialization gives reproducible (untrained) embeddings, with the
-    training procedure defined in the thesis (Section L2) and out of scope
-    for this service.
+    initialization gives reproducible (untrained) embeddings. Contrastive
+    InfoNCE training (§4.3.3) is provided by
+    :class:`~insightpulse.ml.embeddings.trainer.ContrastiveTrainer`,
+    which checkpoints to the same path this engine loads from.
 
     Example:
         >>> engine = TransformerEmbeddingEngine(cache_dir=Path("data/demo"))

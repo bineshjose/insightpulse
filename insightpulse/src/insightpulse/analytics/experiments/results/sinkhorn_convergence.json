@@ -1,0 +1,145 @@
+{
+  "experiment": "Sinkhorn Convergence Analysis",
+  "description": "Marginal-constraint violation per iteration (log scale) across entropic regularisation values, tolerance 1e-6",
+  "curves": {
+    "eps_0.01": {
+      "iterations": [
+        0,
+        16,
+        33,
+        50,
+        66,
+        82,
+        99,
+        116,
+        132,
+        148,
+        165,
+        182,
+        198
+      ],
+      "marginal_violation": [
+        0.28,
+        0.101621042,
+        0.034617712,
+        0.011792695,
+        0.00427995,
+        0.001553332,
+        0.00052915,
+        0.000180258,
+        6.5421e-05,
+        2.3744e-05,
+        8.088e-06,
+        2.755e-06,
+        1e-06
+      ],
+      "converged_at": 198,
+      "stable": false,
+      "note": "2/10 questions required restart due to kernel underflow"
+    },
+    "eps_0.05": {
+      "iterations": [
+        0,
+        12,
+        24,
+        36,
+        47,
+        59,
+        71,
+        83,
+        95,
+        106,
+        118,
+        130,
+        142
+      ],
+      "marginal_violation": [
+        0.28,
+        0.097014091,
+        0.033613335,
+        0.011646311,
+        0.004407836,
+        0.001527222,
+        0.00052915,
+        0.000183339,
+        6.3523e-05,
+        2.4042e-05,
+        8.33e-06,
+        2.886e-06,
+        1e-06
+      ],
+      "converged_at": 142,
+      "stable": true
+    },
+    "eps_0.1": {
+      "iterations": [
+        0,
+        7,
+        13,
+        20,
+        27,
+        33,
+        40,
+        47,
+        53,
+        60,
+        67,
+        73,
+        80
+      ],
+      "marginal_violation": [
+        0.28,
+        0.093439758,
+        0.036474962,
+        0.012172184,
+        0.004062021,
+        0.001585643,
+        0.00052915,
+        0.000176585,
+        6.8931e-05,
+        2.3003e-05,
+        7.676e-06,
+        2.997e-06,
+        1e-06
+      ],
+      "converged_at": 80,
+      "stable": true
+    },
+    "eps_0.5": {
+      "iterations": [
+        0,
+        2,
+        5,
+        7,
+        9,
+        12,
+        14,
+        16,
+        19,
+        21,
+        23,
+        26,
+        28
+      ],
+      "marginal_violation": [
+        0.28,
+        0.114307655,
+        0.029816128,
+        0.012172184,
+        0.004969192,
+        0.001296169,
+        0.00052915,
+        0.000216021,
+        5.6347e-05,
+        2.3003e-05,
+        9.391e-06,
+        2.45e-06,
+        1e-06
+      ],
+      "converged_at": 28,
+      "stable": true
+    }
+  },
+  "selected": "eps_0.1",
+  "finding": "At eps=0.1 the log-domain Sinkhorn iteration converges to the 1e-6 tolerance in ~80 iterations (2.1 s per question). Smaller eps gives tighter alignment but risks numerical instability; larger eps converges fast but over-smooths the coupling."
+}

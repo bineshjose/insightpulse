@@ -1,0 +1,39 @@
+{
+  "experiment": "Encoder Architecture Comparison",
+  "description": "Transformer encoder depth/width comparison at fixed embedding dimension d=128",
+  "results": [
+    {
+      "architecture": "1 layer / 2 heads",
+      "params_millions": 0.4,
+      "js_downstream": 0.026,
+      "silhouette": 0.36,
+      "training_min": 18,
+      "selected": false
+    },
+    {
+      "architecture": "2 layers / 4 heads",
+      "params_millions": 1.2,
+      "js_downstream": 0.017,
+      "silhouette": 0.42,
+      "training_min": 45,
+      "selected": true
+    },
+    {
+      "architecture": "4 layers / 8 heads",
+      "params_millions": 4.8,
+      "js_downstream": 0.018,
+      "silhouette": 0.4,
+      "training_min": 112,
+      "selected": false
+    },
+    {
+      "architecture": "6 layers / 8 heads",
+      "params_millions": 9.2,
+      "js_downstream": 0.019,
+      "silhouette": 0.38,
+      "training_min": 185,
+      "selected": false
+    }
+  ],
+  "finding": "The 2-layer / 4-head configuration provides the optimal balance: equivalent calibration quality at 60% lower training time than larger configurations. Deeper models show marginally worse performance, consistent with overfitting on a 39K-household panel where model capacity exceeds the complexity of the behavioural patterns."
+}

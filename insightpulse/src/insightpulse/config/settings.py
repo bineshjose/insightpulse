@@ -26,9 +26,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # ---------------------------------------------------------------------------
 
 class Environment(StrEnum):
-    """Supported deployment environments."""
+    """Supported deployment environments.
+
+    ``API`` sits between demo and production: it keeps the synthetic CSV
+    panel but performs real LLM inference. ``ENV=prod`` is accepted as an
+    alias for ``production`` (normalized in :class:`Settings`).
+    """
 
     DEMO = "demo"
+    API = "api"
     PRODUCTION = "production"
     TEST = "test"
 
@@ -113,6 +119,11 @@ class CalibrationConfig(BaseSettings):
     # Trade-off: demographic fairness weight (λ_f in thesis)
     lambda_fairness: float = Field(default=0.2, ge=0.0, le=1.0)
 
+    # Uncertainty-aware cost scaling strength (η in thesis §4.5.7):
+    # c'_ij = c_ij / (1 + η·u_i). Headline results use η = 0 (disabled);
+    # positive values make uncertain responses cheaper to reallocate.
+    eta_uncertainty: float = Field(default=0.0, ge=0.0, le=10.0)
+
 
 # ---------------------------------------------------------------------------
 # Embedding Configuration
@@ -150,6 +161,12 @@ class EmbeddingConfig(BaseSettings):
 
     # Random seed for encoder init and K-Means (reproducible embeddings)
     random_seed: int = Field(default=42, ge=0)
+
+    # Contrastive (InfoNCE) training: temperature τ, epochs, and Adam LR.
+    # Positive pairs are the same panelist's purchases in two time windows.
+    contrastive_temperature: float = Field(default=0.07, gt=0.0, le=1.0)
+    training_epochs: int = Field(default=50, ge=1, le=500)
+    learning_rate: float = Field(default=3e-4, gt=0.0, le=1.0)
 
     # File stem for the on-disk embedding cache (relative to the data dir)
     embedding_cache_name: str = "embeddings_cache.npz"
@@ -401,6 +418,14 @@ class Settings(BaseSettings):
     env: Environment = Environment.DEMO
     debug: bool = False
     log_level: str = "INFO"
+
+    @field_validator("env", mode="before")
+    @classmethod
+    def _normalize_env(cls, value: object) -> object:
+        """Accept ``prod`` as an alias for ``production`` (ENV=prod)."""
+        if isinstance(value, str) and value.lower() == "prod":
+            return Environment.PRODUCTION
+        return value
 
     # --- API Keys ---
     anthropic_api_key: SecretStr | None = None

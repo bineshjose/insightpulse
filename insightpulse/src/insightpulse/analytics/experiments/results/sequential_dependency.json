@@ -1,0 +1,23 @@
+{
+  "experiment": "Sequential Question Dependency",
+  "description": "Impact of conditioning on prior answers for multi-question coherence",
+  "results": {
+    "independent": {
+      "spearman": 0.28,
+      "contradiction_rate": 10.4,
+      "consistency": 81.2
+    },
+    "conditioned": {
+      "spearman": 0.65,
+      "contradiction_rate": 1.8,
+      "consistency": 94.6
+    },
+    "empirical": {
+      "spearman": 0.71,
+      "contradiction_rate": 1.2,
+      "consistency": 96.1
+    }
+  },
+  "improvement_pp": 13.4,
+  "finding": "Sequential conditioning raises Spearman correlation on dependent question pairs from 0.28 to 0.65 (human panels: 0.71) and cuts contradictions from 10.4% to 1.8% — a +13.4 pp consistency improvement that recovers most of the gap to human coherence. Marginal distributions (JS) are unaffected."
+}

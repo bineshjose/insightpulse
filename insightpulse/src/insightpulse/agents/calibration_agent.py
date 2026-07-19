@@ -26,8 +26,10 @@ from typing import Any
 
 import numpy as np
 
+from insightpulse.config.settings import get_settings
 from insightpulse.core.exceptions import CalibrationError
 from insightpulse.ml.calibration import get_calibration_engine
+from insightpulse.ml.generation.uncertainty import category_uncertainty
 from insightpulse.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -76,6 +78,13 @@ async def calibration_agent_node(state: dict[str, Any]) -> dict[str, Any]:
         q_responses = [r for r in responses if r.get("question_id") == question_id]
         raw_distribution = _compute_distribution(q_responses, options)
         group_distributions = _group_distributions(q_responses, options)
+        # Per-category generator uncertainty feeds the η cost scaling;
+        # skipped entirely at the thesis default η = 0.
+        source_uncertainty = (
+            category_uncertainty(q_responses, options)
+            if get_settings().calibration.eta_uncertainty > 0.0
+            else None
+        )
 
         try:
             output, metrics = await engine.calibrate_question(
@@ -83,6 +92,7 @@ async def calibration_agent_node(state: dict[str, Any]) -> dict[str, Any]:
                 options=options,
                 raw_distribution=raw_distribution,
                 group_distributions=group_distributions,
+                source_uncertainty=source_uncertainty,
             )
         except CalibrationError as exc:
             logger.error(
@@ -134,7 +144,12 @@ def _compute_distribution(
     responses: list[dict[str, Any]],
     options: list[str],
 ) -> np.ndarray:
-    """Compute the response distribution across options.
+    """Compute the expansion-weighted response distribution across options.
+
+    Each respondent contributes their panel expansion factor w_i rather
+    than a unit count (§3.1.3): synthetic aggregates then align with
+    population benchmarks instead of naive sample proportions. Responses
+    without a weight fall back to 1.0.
 
     Exact matches are counted first; the bidirectional-substring fallback
     handles verbose LLM phrasings ("I would say: Agree"). Exact-first
@@ -151,13 +166,14 @@ def _compute_distribution(
     lowered = [opt.lower().strip() for opt in options]
 
     for resp in responses:
+        weight = float(resp.get("expansion_factor", 1.0) or 1.0)
         answer = resp.get("answer", "").lower().strip()
         if answer in lowered:
-            counts[lowered.index(answer)] += 1
+            counts[lowered.index(answer)] += weight
             continue
         for i, option in enumerate(lowered):
             if option in answer or answer in option:
-                counts[i] += 1
+                counts[i] += weight
                 break
 
     # Normalize with Laplace smoothing to avoid zero probabilities

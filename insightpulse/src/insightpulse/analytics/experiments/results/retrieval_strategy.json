@@ -1,0 +1,42 @@
+{
+  "experiment": "Persona Context Retrieval Strategy",
+  "description": "Retrieval of behaviourally similar panelists for few-shot conditioning context",
+  "results": [
+    {
+      "strategy": "No retrieval",
+      "js": 0.034,
+      "coupling": 0.41,
+      "latency_ms": 0.0,
+      "selected": false
+    },
+    {
+      "strategy": "Random k=5",
+      "js": 0.028,
+      "coupling": 0.48,
+      "latency_ms": 0.3,
+      "selected": false
+    },
+    {
+      "strategy": "FAISS k=3",
+      "js": 0.021,
+      "coupling": 0.54,
+      "latency_ms": 1.1,
+      "selected": false
+    },
+    {
+      "strategy": "FAISS k=5",
+      "js": 0.017,
+      "coupling": 0.58,
+      "latency_ms": 1.2,
+      "selected": true
+    },
+    {
+      "strategy": "FAISS k=10",
+      "js": 0.018,
+      "coupling": 0.57,
+      "latency_ms": 1.4,
+      "selected": false
+    }
+  ],
+  "finding": "Retrieval of k=5 nearest neighbours provides the best behaviour-response coupling (0.58) at 1.2 ms per query. Increasing to k=10 dilutes the conditioning signal with less-similar panelists."
+}

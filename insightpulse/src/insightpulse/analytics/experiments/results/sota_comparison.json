@@ -1,0 +1,47 @@
+{
+  "experiment": "State-of-the-Art Comparison",
+  "note": "Baseline values are approximate figures derived from the cited publications and may not be directly comparable due to differences in evaluation methodology.",
+  "results": [
+    {
+      "method": "Silicon Sampling (Argyle et al., 2023)",
+      "js": 0.08,
+      "hallucination": 10.0,
+      "consistency": 82.0,
+      "calibration": "None",
+      "production_ready": false
+    },
+    {
+      "method": "MRP Adjustment (Park et al., 2004)",
+      "js": 0.05,
+      "hallucination": null,
+      "consistency": null,
+      "calibration": "Post-hoc weighting",
+      "production_ready": false
+    },
+    {
+      "method": "Twin-2K Personas (2023)",
+      "js": 0.06,
+      "hallucination": 8.0,
+      "consistency": 85.0,
+      "calibration": "None",
+      "production_ready": false
+    },
+    {
+      "method": "LLM + Demographic prompts",
+      "js": 0.07,
+      "hallucination": 9.0,
+      "consistency": 80.0,
+      "calibration": "None",
+      "production_ready": false
+    },
+    {
+      "method": "InsightPulse (ours)",
+      "js": 0.017,
+      "hallucination": 1.9,
+      "consistency": 94.6,
+      "calibration": "BDCL (Sinkhorn OT)",
+      "production_ready": true
+    }
+  ],
+  "finding": "InsightPulse achieves substantially lower JS divergence than all compared approaches, with hallucination and consistency levels that surpass prior work by a wide margin. The primary methodological distinction is BDCL: no prior approach incorporates a formal post-generation calibration mechanism."
+}

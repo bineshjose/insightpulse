@@ -1,0 +1,35 @@
+{
+  "experiment": "Clustering Algorithm Comparison",
+  "description": "Comparison of clustering methods for behavioural archetype discovery at K=5",
+  "results": [
+    {
+      "algorithm": "K-Means (K=5)",
+      "silhouette": 0.42,
+      "js_downstream": 0.017,
+      "fit_time_sec": 12,
+      "selected": true
+    },
+    {
+      "algorithm": "Gaussian Mixture (K=5)",
+      "silhouette": 0.4,
+      "js_downstream": 0.018,
+      "fit_time_sec": 34,
+      "selected": false
+    },
+    {
+      "algorithm": "Agglomerative (Ward, K=5)",
+      "silhouette": 0.41,
+      "js_downstream": 0.019,
+      "fit_time_sec": 48,
+      "selected": false
+    },
+    {
+      "algorithm": "DBSCAN (eps=0.5)",
+      "silhouette": 0.31,
+      "js_downstream": 0.025,
+      "fit_time_sec": 22,
+      "selected": false
+    }
+  ],
+  "finding": "K-Means is selected for its interpretability and computational efficiency. DBSCAN produces uneven cluster sizes and assigns 8% of households to noise, degrading downstream calibration."
+}

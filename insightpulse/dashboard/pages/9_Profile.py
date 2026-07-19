@@ -10,7 +10,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, theme
+from components import auth, demo_engine, theme
 
 user = auth.require_page("profile")
 theme.page_header("User Profile", "Account, preferences, and usage.", "Profile")
@@ -151,7 +151,7 @@ _SURVEY_TREND = [8, 11, 9, 12, 10, 14]
 _RESPONSE_TREND = [640, 1120, 890, 1710, 1980, 2560]
 _MONTH_SURVEYS = _SURVEY_TREND[-1]
 _MONTH_RESPONSES = _RESPONSE_TREND[-1]
-history = st.session_state.get("run_history", [])
+history = demo_engine.ensure_seeded_history()
 live_responses = sum(r["totals"]["total_responses"] for r in history)
 
 

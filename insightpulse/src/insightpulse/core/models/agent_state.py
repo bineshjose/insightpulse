@@ -100,6 +100,10 @@ class SurveyPipelineState(TypedDict, total=False):
     validation_retry_count: int
     needs_regeneration: bool
 
+    # --- RedTeamAgent (adversarial validation, §4.5.15) ---
+    red_team_rejected: list[dict]
+    red_team_flag_summary: dict[str, int]
+
     # --- CalibrationAgent ---
     calibrated_distributions: dict[str, list[float]]
     calibration_metrics: list[dict]

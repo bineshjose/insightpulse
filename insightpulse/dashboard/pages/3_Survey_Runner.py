@@ -145,9 +145,16 @@ with col4:
 mode = st.radio("Execution mode", ["Demo Mode", "Production Mode"], horizontal=True)
 
 with st.expander("⚙ Advanced settings"):
-    seed = st.number_input(
-        "Random seed", value=42, min_value=0, step=1,
-        help="Fixes the sampling so a run can be reproduced exactly.",
+    fix_seed = st.toggle(
+        "Fix random seed", value=False,
+        help="Off: every run varies. On: runs reproduce exactly for the seed.",
+    )
+    seed = (
+        int(st.number_input(
+            "Random seed", value=42, min_value=0, step=1,
+            help="Fixes the sampling so a run can be reproduced exactly.",
+        ))
+        if fix_seed else None
     )
 
 # ---------------------------------------------------------------------------
@@ -252,7 +259,7 @@ if submitted and can_run:
             f"{'match' if matches != 1 else 'matches'} the selected filters "
             f"(requested: {cohort_size}). Adjust filters for a larger cohort."
         )
-    cohort = cohort_pool.sample(n=effective_size, random_state=int(seed))
+    cohort = cohort_pool.sample(n=effective_size, random_state=seed)
 
     metadata = {
         "survey_id": make_survey_id(demo_engine.next_survey_sequence()),
@@ -272,7 +279,7 @@ if submitted and can_run:
         with st.spinner("Running the 8-agent pipeline..."):
             run = demo_engine.run_survey(
                 questions, cohort, model,
-                seed=int(seed), calibrate=calibrate, metadata=metadata,
+                seed=seed, calibrate=calibrate, metadata=metadata,
             )
         demo_engine.store_run(run)
         auth.record_activity(
@@ -285,7 +292,7 @@ if submitted and can_run:
             "cohort_size": effective_size,
             "context": "US consumer goods market",
             "models": [model],
-            "seed": int(seed),
+            "seed": seed,
         }
         with st.spinner("Running survey through the API pipeline..."):
             try:

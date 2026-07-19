@@ -1,0 +1,39 @@
+{
+  "experiment": "Fairness Weight Sensitivity (lambda_f)",
+  "description": "Demographic parity enforcement vs aggregate calibration accuracy",
+  "results": [
+    {
+      "lambda_f": 0.0,
+      "js": 0.015,
+      "max_group_deviation_pp": 4.2,
+      "js_penalty": 0.0,
+      "affected_group": "Age 18-24",
+      "selected": false
+    },
+    {
+      "lambda_f": 0.1,
+      "js": 0.016,
+      "max_group_deviation_pp": 3.1,
+      "js_penalty": 0.001,
+      "affected_group": "Age 18-24",
+      "selected": false
+    },
+    {
+      "lambda_f": 0.2,
+      "js": 0.017,
+      "max_group_deviation_pp": 1.8,
+      "js_penalty": 0.002,
+      "affected_group": "Age 18-24",
+      "selected": true
+    },
+    {
+      "lambda_f": 0.3,
+      "js": 0.019,
+      "max_group_deviation_pp": 0.9,
+      "js_penalty": 0.004,
+      "affected_group": "Income Q1",
+      "selected": false
+    }
+  ],
+  "finding": "At lambda_f=0 the maximum group deviation reaches 4.2 pp, concentrated in the 18-24 age bracket where the panel has the fewest respondents. lambda_f=0.2 reduces it to 1.8 pp, satisfying the 2 pp demographic-parity threshold at a JS penalty of only 0.002 above the unconstrained optimum."
+}

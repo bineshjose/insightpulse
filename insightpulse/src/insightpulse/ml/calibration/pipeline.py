@@ -151,6 +151,7 @@ class CalibrationEngine(ABC):
         options: list[str],
         raw_distribution: np.ndarray,
         group_distributions: dict[str, np.ndarray] | None = None,
+        source_uncertainty: np.ndarray | None = None,
     ) -> tuple[CalibrationOutput, CalibrationMetrics]:
         """Full per-question calibration pipeline (Template Method).
 
@@ -161,8 +162,12 @@ class CalibrationEngine(ABC):
             question_id: Question being calibrated.
             options: Option labels in scale order.
             raw_distribution: P_syn over the options (normalized inside).
+                Expansion-weighted upstream: each respondent contributes
+                their panel expansion factor, not a unit count (§3.1.3).
             group_distributions: Optional per-demographic-group raw
                 distributions for fairness verification.
+            source_uncertainty: Optional per-category generator
+                uncertainty for η-scaled transport costs (§4.5.7).
 
         Returns:
             (CalibrationOutput, CalibrationMetrics).
@@ -185,6 +190,10 @@ class CalibrationEngine(ABC):
             synthetic_distribution=source.tolist(),
             empirical_distribution=target.tolist(),
             option_labels=options,
+            source_uncertainty=(
+                None if source_uncertainty is None
+                else np.asarray(source_uncertainty, dtype=np.float64).tolist()
+            ),
         ))
         calibrated = np.asarray(output.calibrated_distribution)
 
@@ -320,14 +329,28 @@ class SinkhornCalibrationEngine(CalibrationEngine):
         source = np.asarray(calibration_input.synthetic_distribution)
         target = np.asarray(calibration_input.empirical_distribution)
 
+        cost = self._ordinal_cost_matrix(len(source))
+        # Uncertainty-aware scaling (η, §4.5.7): rows where the generator
+        # was least committed become cheaper to reallocate. η = 0 (the
+        # headline configuration) leaves the ordinal cost untouched.
+        eta = self._config.eta_uncertainty
+        if eta > 0.0 and calibration_input.source_uncertainty is not None:
+            uncertainty = np.asarray(
+                calibration_input.source_uncertainty, dtype=np.float64
+            )
+            if uncertainty.shape != source.shape:
+                raise CalibrationError(
+                    f"Uncertainty shape {uncertainty.shape} does not match "
+                    f"source {source.shape}"
+                )
+            cost = cost / (1.0 + eta * uncertainty[:, None])
+
         solver = SinkhornSolver(
             epsilon=self._config.sinkhorn_epsilon,
             max_iterations=self._config.sinkhorn_max_iter,
             threshold=self._config.sinkhorn_threshold,
         )
-        plan, info = solver.solve(
-            source, target, self._ordinal_cost_matrix(len(source))
-        )
+        plan, info = solver.solve(source, target, cost)
 
         # The plan's column marginal is the transported distribution;
         # behavioral regularization then pulls it back toward P_syn by λ_b.

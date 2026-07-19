@@ -19,6 +19,7 @@ import pandas as pd
 
 from insightpulse.config.settings import GenerationConfig, get_settings
 from insightpulse.core.exceptions import CircuitBreakerOpenError, GenerationError
+from insightpulse.ml.generation import uncertainty as uncertainty_mod
 from insightpulse.ml.generation.persona_builder import PersonaPromptBuilder
 from insightpulse.ml.generation.response_parser import ResponseParser
 from insightpulse.utils.logging import get_logger
@@ -179,6 +180,14 @@ class DemoGenerationEngine(GenerationEngine):
                     "confidence": round(
                         float(np.clip(rng.normal(0.78, 0.12), 0.05, 0.99)), 2
                     ),
+                    # Analytic form of the k-sample entropy estimator
+                    # (§4.4.5): the conditional distribution is known here.
+                    "uncertainty": round(
+                        uncertainty_mod.distribution_uncertainty(dist), 4
+                    ),
+                    # Synthetic units inherit their panelist's expansion
+                    # weight (§3.1.3) for expansion-weighted calibration.
+                    "expansion_factor": float(row.get("expansion_factor", 1.0)),
                     "model_used": model,
                     "generation_time_ms": float(profile["latency_ms"]),
                     "token_count": int(profile["tokens_per_response"]),
@@ -492,6 +501,10 @@ class LLMGenerationEngine(GenerationEngine):
             "answer": parsed["answer"],
             "reasoning": parsed["reasoning"],
             "confidence": parsed["confidence"],
+            # Synthetic units inherit the panelist's expansion weight
+            # (§3.1.3); k-sample uncertainty is estimated downstream when
+            # η-aware calibration is enabled.
+            "expansion_factor": float(panelist.get("expansion_factor", 1.0)),
             "model_used": model,
             "generation_time_ms": result.latency_ms,
             "token_count": result.total_tokens,

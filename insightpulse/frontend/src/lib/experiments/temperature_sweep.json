@@ -1,0 +1,48 @@
+{
+  "experiment": "LLM Temperature Sweep",
+  "model": "Claude Sonnet 4.6",
+  "description": "Impact of sampling temperature on response diversity, consistency, and hallucination",
+  "results": [
+    {
+      "temperature": 0.3,
+      "entropy": 1.42,
+      "consistency": 97.2,
+      "hallucination": 0.8,
+      "effective_categories": 2.7,
+      "selected": false
+    },
+    {
+      "temperature": 0.5,
+      "entropy": 1.89,
+      "consistency": 96.1,
+      "hallucination": 1.2,
+      "effective_categories": 3.7,
+      "selected": false
+    },
+    {
+      "temperature": 0.7,
+      "entropy": 2.31,
+      "consistency": 94.6,
+      "hallucination": 1.9,
+      "effective_categories": 5.0,
+      "selected": true
+    },
+    {
+      "temperature": 0.9,
+      "entropy": 2.58,
+      "consistency": 91.2,
+      "hallucination": 3.4,
+      "effective_categories": 6.0,
+      "selected": false
+    },
+    {
+      "temperature": 1.0,
+      "entropy": 2.71,
+      "consistency": 88.5,
+      "hallucination": 4.8,
+      "effective_categories": 6.5,
+      "selected": false
+    }
+  ],
+  "finding": "T=0.3 fails the entropy floor (1.42 < 1.5 bits, only 2.7 effective categories). T=1.0 approaches the hallucination ceiling (4.8% < 5%) with no safety margin. T=0.7 satisfies all acceptance criteria with adequate margins."
+}

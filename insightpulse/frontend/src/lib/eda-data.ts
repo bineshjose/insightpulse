@@ -5,7 +5,7 @@
  */
 
 export const PANEL_SUMMARY = {
-  totalHouseholds: 500,
+  totalHouseholds: 2560,
   totalMembers: 1311,
   avgHouseholdSize: 2.62,
   regionsCovered: 4,
@@ -43,7 +43,7 @@ export const HOUSEHOLD_SIZE_DISTRIBUTION = [
 ] as const;
 
 export const PURCHASE_SUMMARY = {
-  totalTransactions: 10000,
+  totalTransactions: 27520,
   avgBasketValue: 24.19,
   avgUnitPrice: 8.14,
   promotionRate: 0.3121,

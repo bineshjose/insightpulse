@@ -1,0 +1,39 @@
+{
+  "experiment": "Benchmark Cross-Validation",
+  "description": "Generalisation beyond the primary panel using the same BDCL configuration (eps=0.1, lambda_b=0.3, lambda_f=0.2)",
+  "benchmarks": [
+    {
+      "name": "NIQ Panel (primary)",
+      "records": 2547,
+      "domain": "Consumer / FMCG",
+      "js": 0.017,
+      "hallucination": 1.9,
+      "consistency": 94.6
+    },
+    {
+      "name": "Pew ATP",
+      "records": 12400,
+      "domain": "Political / social attitudes",
+      "js": 0.024,
+      "hallucination": 2.8,
+      "consistency": 91.3
+    },
+    {
+      "name": "ESS Round 11",
+      "records": 8200,
+      "domain": "Cross-country social attitudes",
+      "js": 0.031,
+      "hallucination": 3.4,
+      "consistency": 89.7
+    },
+    {
+      "name": "Twin-2K-500",
+      "records": 500,
+      "domain": "General personas",
+      "js": 0.019,
+      "hallucination": 2.1,
+      "consistency": 93.2
+    }
+  ],
+  "finding": "Performance degrades gracefully as the domain diverges from the consumer/FMCG context the behavioural embeddings were trained on. Pew and ESS show higher JS (0.024, 0.031) but remain within the 0.05 acceptance threshold; Twin-2K-500 lands close to the primary evaluation, confirming generalisation to persona-based tasks."
+}

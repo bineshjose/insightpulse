@@ -2,11 +2,14 @@
 
 Produces three CSV files in ``data/demo/``:
 
-- ``panelists.csv`` — 500 households with jointly realistic demographics
+- ``panelists.csv`` — 2,560 households with jointly realistic demographics
   (income correlates with age and education, children with age, etc.) and
-  a latent behavioral archetype matching the K=5 clusters in L2.
-- ``purchases.csv`` — 10,000 purchase records whose category mix, price
-  tier, and promotion response are driven by each household's archetype.
+  a latent behavioral archetype matching the K=5 clusters in L2, held to
+  exact quota counts (25/15/20/25/15%).
+- ``purchases.csv`` — 27,520 purchase records (≈10.75 per household) whose
+  category mix, price tier, promotion response, and shopping calendar
+  (weekday/seasonal weighting across Oct 2024 - Jun 2026) are driven by
+  each household's archetype.
 - ``survey_responses.csv`` — historical survey answers per household,
   conditioned on archetype and demographics, used as the empirical ground
   truth that digital twins are validated against.
@@ -36,21 +39,35 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 DEFAULT_SEED = 42
-NUM_PANELISTS = 500
-NUM_PURCHASES = 10_000
+NUM_PANELISTS = 2_560
+NUM_PURCHASES = 27_520
 OUTPUT_DIR = Path(__file__).parent
 
 # Fixed reference date so generated data never drifts between runs.
+# Purchase history spans 2024-10-01 .. 2026-06-30 (638 days).
 REFERENCE_DATE = date(2026, 6, 30)
-HISTORY_DAYS = 365
+HISTORY_DAYS = (REFERENCE_DATE - date(2024, 10, 1)).days + 1
 
 AGE_GROUPS = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
 AGE_WEIGHTS = [0.12, 0.22, 0.20, 0.18, 0.15, 0.13]
 
+# Numeric age sampled within each bracket (panel covers ages 18-85).
+AGE_RANGE_BY_GROUP: dict[str, tuple[int, int]] = {
+    "18-24": (18, 24),
+    "25-34": (25, 34),
+    "35-44": (35, 44),
+    "45-54": (45, 54),
+    "55-64": (55, 64),
+    "65+": (65, 85),
+}
+
 INCOME_GROUPS = ["low", "lower_middle", "middle", "upper_middle", "high"]
 
-REGIONS = ["northeast", "midwest", "south", "west"]
-REGION_WEIGHTS = [0.17, 0.21, 0.38, 0.24]
+REGIONS = [
+    "northeast", "mid_atlantic", "southeast", "south",
+    "midwest", "mountain", "west", "pacific",
+]
+REGION_WEIGHTS = [0.14, 0.10, 0.16, 0.12, 0.15, 0.07, 0.12, 0.14]
 
 HOUSEHOLD_SIZES = ["1", "2", "3-4", "5+"]
 
@@ -148,6 +165,17 @@ ARCHETYPES: dict[str, dict[str, Any]] = {
     },
 }
 
+# Exact population share per archetype (matches the K=5 cluster profile:
+# C0 25% / C1 15% / C2 20% / C3 25% / C4 15%). Enforced as hard quotas so
+# the generated panel always lands on these counts exactly.
+ARCHETYPE_QUOTAS: dict[str, float] = {
+    "price_sensitive": 0.25,
+    "premium_loyalist": 0.15,
+    "category_explorer": 0.20,
+    "convenience_oriented": 0.15,
+    "promotion_driven": 0.25,
+}
+
 # P(archetype | income group) — premium behavior concentrates in higher
 # brackets, value seeking in lower ones. Order matches ARCHETYPES keys.
 ARCHETYPE_BY_INCOME: dict[str, list[float]] = {
@@ -158,15 +186,17 @@ ARCHETYPE_BY_INCOME: dict[str, list[float]] = {
     "high": [0.061, 0.365, 0.196, 0.254, 0.124],
 }
 
+# Recognisable brands per category so demo data reads like real FMCG panel
+# records. Order loosely maps to price tier (value first, premium last).
 BRANDS_BY_CATEGORY: dict[str, list[str]] = {
-    "snacks": ["CrispWave", "SnackJoy", "GoldenBite", "NutriCrunch"],
-    "beverages": ["AquaPure", "FizzCo", "SunSqueeze", "BrewMaster"],
-    "dairy": ["MeadowFresh", "DairyGold", "CreamHill"],
-    "bakery": ["OvenCraft", "MorningLoaf", "GrainHouse"],
-    "frozen_foods": ["FrostBite", "QuickPlate", "PolarFarm"],
-    "household_care": ["SparkleHome", "CleanWave", "PureNest"],
-    "personal_care": ["SilkGlow", "FreshEra", "VitaCare"],
-    "produce": ["FarmDirect", "GreenValley", "OrchardLane"],
+    "snacks": ["Lay's", "Pringles", "Doritos", "Cheetos", "Ritz"],
+    "beverages": ["Coca-Cola", "Pepsi", "Dr Pepper", "Gatorade", "Tropicana"],
+    "dairy": ["Chobani", "Yoplait", "Philadelphia", "Land O'Lakes"],
+    "bakery": ["Wonder Bread", "Sara Lee", "Thomas'", "Entenmann's"],
+    "frozen_foods": ["Stouffer's", "DiGiorno", "Birds Eye", "Hot Pockets"],
+    "household_care": ["Tide", "Clorox", "Dawn", "Febreze"],
+    "personal_care": ["Dove", "Colgate", "Pantene", "Nivea"],
+    "produce": ["Dole", "Chiquita", "Fresh Express", "Driscoll's"],
 }
 
 STORE_TYPES = ["supermarket", "convenience", "online", "warehouse_club", "discount"]
@@ -271,6 +301,17 @@ ANSWER_WEIGHTS: dict[str, dict[str, list[float]]] = {
 # Generators
 # ---------------------------------------------------------------------------
 
+def _archetype_quota_counts(n: int) -> dict[str, int]:
+    """Exact archetype counts for a panel of size ``n``.
+
+    Quotas are rounded per archetype; any rounding remainder lands on the
+    largest-quota archetype so the counts always sum to ``n``.
+    """
+    counts = {name: round(n * share) for name, share in ARCHETYPE_QUOTAS.items()}
+    counts["price_sensitive"] += n - sum(counts.values())
+    return counts
+
+
 def generate_panelists(rng: np.random.Generator, n: int = NUM_PANELISTS) -> pd.DataFrame:
     """Generate panelist households with jointly realistic demographics.
 
@@ -278,6 +319,10 @@ def generate_panelists(rng: np.random.Generator, n: int = NUM_PANELISTS) -> pd.D
     independently, so the marginals AND the correlations (education→income,
     age→children, income→archetype) look plausible. This matters because
     the BDCL fairness constraints are tested against these joint patterns.
+
+    Archetypes are held to exact quota counts (ARCHETYPE_QUOTAS) while still
+    respecting the income correlation: each household samples from
+    P(archetype | income) restricted to archetypes with remaining quota.
 
     Args:
         rng: Seeded random generator.
@@ -288,9 +333,11 @@ def generate_panelists(rng: np.random.Generator, n: int = NUM_PANELISTS) -> pd.D
     """
     rows: list[dict[str, Any]] = []
     archetype_names = list(ARCHETYPES.keys())
+    remaining = _archetype_quota_counts(n)
 
     for i in range(n):
         age_group = rng.choice(AGE_GROUPS, p=AGE_WEIGHTS)
+        age_low, age_high = AGE_RANGE_BY_GROUP[age_group]
         education = rng.choice(EDUCATION_LEVELS, p=EDUCATION_BY_AGE[age_group])
         income_group = rng.choice(INCOME_GROUPS, p=INCOME_BY_EDUCATION[education])
         employment = rng.choice(EMPLOYMENT_STATUSES, p=EMPLOYMENT_BY_AGE[age_group])
@@ -302,11 +349,20 @@ def generate_panelists(rng: np.random.Generator, n: int = NUM_PANELISTS) -> pd.D
         else:
             household_size = rng.choice(["1", "2", "3-4"], p=[0.38, 0.48, 0.14])
 
-        archetype = rng.choice(archetype_names, p=ARCHETYPE_BY_INCOME[income_group])
+        # Quota-constrained draw from P(archetype | income): zero out
+        # exhausted archetypes and renormalize before sampling.
+        weights = np.array([
+            p if remaining[name] > 0 else 0.0
+            for name, p in zip(archetype_names, ARCHETYPE_BY_INCOME[income_group],
+                               strict=True)
+        ])
+        archetype = str(rng.choice(archetype_names, p=weights / weights.sum()))
+        remaining[archetype] -= 1
 
         join_offset = int(rng.integers(HISTORY_DAYS, 5 * HISTORY_DAYS))
         rows.append({
             "panelist_id": f"HH{i + 1:05d}",
+            "age": int(rng.integers(age_low, age_high + 1)),
             "age_group": age_group,
             "income_group": income_group,
             "region": rng.choice(REGIONS, p=REGION_WEIGHTS),
@@ -320,6 +376,31 @@ def generate_panelists(rng: np.random.Generator, n: int = NUM_PANELISTS) -> pd.D
         })
 
     return pd.DataFrame(rows)
+
+
+def _daily_purchase_weights() -> np.ndarray:
+    """Purchase-date sampling weights over the history window.
+
+    Encodes a realistic shopping calendar: weekend peaks, a December
+    holiday surge, a January trough, and a mild back-to-school lift —
+    so the drift monitor and EDA views see genuine temporal texture
+    instead of a uniform smear.
+    """
+    weekday_factor = {0: 0.95, 1: 0.92, 2: 0.96, 3: 1.00, 4: 1.10, 5: 1.25, 6: 1.12}
+    weights = np.empty(HISTORY_DAYS)
+    for offset in range(HISTORY_DAYS):
+        day = REFERENCE_DATE - timedelta(days=offset)
+        factor = weekday_factor[day.weekday()]
+        if day.month == 12:
+            factor *= 1.30
+        elif day.month == 11 and day.day >= 20:
+            factor *= 1.20
+        elif day.month == 1:
+            factor *= 0.88
+        elif day.month in (8, 9):
+            factor *= 1.05
+        weights[offset] = factor
+    return weights / weights.sum()
 
 
 def generate_purchases(
@@ -346,11 +427,13 @@ def generate_purchases(
         {name: spec["frequency_weight"] for name, spec in ARCHETYPES.items()}
     ).to_numpy()
     allocation = rng.multinomial(n, freq / freq.sum())
+    date_weights = _daily_purchase_weights()
 
     rows: list[dict[str, Any]] = []
     for (_, panelist), count in zip(panelists.iterrows(), allocation, strict=True):
         spec = ARCHETYPES[panelist["behavioral_archetype"]]
-        for _ in range(count):
+        day_offsets = rng.choice(HISTORY_DAYS, size=count, p=date_weights)
+        for offset in day_offsets:
             category = rng.choice(PRODUCT_CATEGORIES, p=spec["category_weights"])
             tier = rng.choice(PRICE_TIERS, p=spec["tier_weights"])
             low, high = TIER_PRICE_RANGES[tier]
@@ -363,7 +446,7 @@ def generate_purchases(
             rows.append({
                 "panelist_id": panelist["panelist_id"],
                 "transaction_date": (
-                    REFERENCE_DATE - timedelta(days=int(rng.integers(0, HISTORY_DAYS)))
+                    REFERENCE_DATE - timedelta(days=int(offset))
                 ).isoformat(),
                 "product_category": category,
                 "brand": rng.choice(BRANDS_BY_CATEGORY[category]),

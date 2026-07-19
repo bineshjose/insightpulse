@@ -13,19 +13,108 @@ from components import auth, data_loader, demo_engine, theme
 from components.charts import PLOTLY_CONFIG, STATUS, distribution_chart
 
 sys.path.insert(0, str(data_loader.REPO_ROOT / "src"))
+from insightpulse.analytics.experiments import get_experiment, load_result_file
 from insightpulse.utils import metrics as m
 
 user = auth.require_page("validation")
 theme.page_header(
     "Validation",
-    "Cross-validation of the synthetic panel against empirical ground "
-    "truth benchmarks.",
+    "Acceptance criteria, benchmark cross-validation, and interactive "
+    "verification against empirical ground truth.",
     "Validation",
 )
 
 if not data_loader.require_data():
     theme.footer()
     st.stop()
+
+_SELECTED_BG = "background-color:#E7F6DF; color:#2E6318; font-weight:600;"
+
+# ---------------------------------------------------------------------------
+# Acceptance criteria (recorded evaluation results)
+# ---------------------------------------------------------------------------
+
+acceptance = load_result_file("acceptance_criteria")
+all_pass = acceptance["passed"] == acceptance["total"]
+st.markdown(
+    f"""
+<div style="background:{'#E7F6DF' if all_pass else '#FBEAE8'};
+            border:1px solid {'#6CC24A' if all_pass else '#E03C31'};
+            border-radius:10px; padding:0.9rem 1.2rem; display:flex;
+            align-items:center; gap:1rem; margin-bottom:0.8rem;">
+  <div style="font-size:2.2rem; font-weight:800;
+              color:{'#2E6318' if all_pass else '#8C2318'};">
+    Grade {acceptance["grade"]}
+  </div>
+  <div style="font-size:0.95rem; color:{'#2E6318' if all_pass else '#8C2318'};">
+    <b>{acceptance["passed"]}/{acceptance["total"]} acceptance criteria passed.</b><br/>
+    {acceptance["finding"]}
+  </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+cards = st.columns(3)
+for index, criterion in enumerate(acceptance["criteria"]):
+    op = "≥" if criterion["direction"] == "min" else "≤"
+    unit = criterion["unit"]
+    with cards[index % 3]:
+        st.markdown(theme.kpi_card(
+            criterion["metric"],
+            f"{criterion['value']}{unit}",
+            f"✓ Pass · target {op} {criterion['threshold']}{unit} · "
+            f"margin {criterion['margin']}{unit}",
+            "good",
+        ), unsafe_allow_html=True)
+
+with st.expander("Criteria detail — components and justification basis"):
+    st.dataframe(
+        theme.humanize_columns(pd.DataFrame(acceptance["criteria"])),
+        use_container_width=True, hide_index=True,
+    )
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Benchmark cross-validation (recorded evaluation results)
+# ---------------------------------------------------------------------------
+
+st.subheader("Benchmark cross-validation")
+bench = get_experiment("benchmark_validation")
+bench_payload = bench.load_results()
+st.dataframe(
+    theme.humanize_columns(pd.DataFrame(bench_payload["benchmarks"])),
+    use_container_width=True, hide_index=True,
+)
+st.plotly_chart(bench.generate_chart(), use_container_width=True, config=PLOTLY_CONFIG)
+st.caption(bench_payload["finding"])
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# State-of-the-art summary (recorded evaluation results)
+# ---------------------------------------------------------------------------
+
+st.subheader("Comparison with prior approaches")
+sota_payload = load_result_file("sota_comparison")
+sota_frame = pd.DataFrame(sota_payload["results"])
+ours_mask = sota_frame["method"].str.contains("InsightPulse")
+st.dataframe(
+    theme.humanize_columns(sota_frame).reset_index(drop=True).style.apply(
+        lambda row: [_SELECTED_BG if ours_mask.iloc[row.name] else ""] * len(row),
+        axis=1,
+    ),
+    use_container_width=True, hide_index=True,
+)
+st.caption(sota_payload["note"])
+
+st.divider()
+st.subheader("Interactive cross-validation")
+st.markdown(
+    "Generate a fresh synthetic panel and compare it against the empirical "
+    "ground truth on demand."
+)
 
 # Acceptance targets per metric.
 TARGETS = {
@@ -197,22 +286,5 @@ with st.expander("Table view"):
         "Calibrated %": [round(v, 1) for v in _pct(result["calibrated_counts"])],
         "Empirical %": [round(v, 1) for v in _pct(result["empirical_counts"])],
     }), use_container_width=True, hide_index=True)
-
-st.divider()
-
-# ---------------------------------------------------------------------------
-# External benchmarks
-# ---------------------------------------------------------------------------
-
-st.subheader("Benchmark sources")
-st.dataframe(pd.DataFrame({
-    "Benchmark": ["Pew American Trends Panel", "European Social Survey", "Twin-2K-500"],
-    "Role": [
-        "US attitudinal ground truth (wave-matched questions)",
-        "Cross-country attitudinal validation",
-        "Published digital-twin benchmark for direct comparison",
-    ],
-    "Coverage": ["Waves 2023-2025", "Round 11", "Full panel"],
-}), use_container_width=True, hide_index=True)
 
 theme.footer()

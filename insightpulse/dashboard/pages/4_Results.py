@@ -8,7 +8,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, data_loader, theme
+from components import auth, data_loader, demo_engine, theme
 from components.charts import CATEGORICAL, PLOTLY_CONFIG, distribution_chart
 
 user = auth.require_page("results")
@@ -19,7 +19,7 @@ theme.page_header(
     "Results",
 )
 
-history = st.session_state.get("run_history", [])
+history = demo_engine.ensure_seeded_history()
 if not history:
     st.info("No results yet — run a survey to get started.", icon="✨")
     can_run = data_loader.data_available() and auth.has_permission(user, "run")

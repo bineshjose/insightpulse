@@ -30,7 +30,12 @@ function humanize(value: string): string {
 const ANY = { value: "", label: "Any" };
 const AGE_GROUPS = [ANY, ...["18-24", "25-34", "35-44", "45-54", "55-64", "65+"].map((v) => ({ value: v, label: v }))];
 const INCOME_GROUPS = [ANY, ...["low", "lower_middle", "middle", "upper_middle", "high"].map((v) => ({ value: v, label: humanize(v) }))];
-const REGIONS = [ANY, ...["northeast", "midwest", "south", "west"].map((v) => ({ value: v, label: humanize(v) }))];
+const REGIONS = [
+  ANY,
+  ...["northeast", "mid_atlantic", "southeast", "south", "midwest", "mountain", "west", "pacific"].map(
+    (v) => ({ value: v, label: humanize(v) }),
+  ),
+];
 const ARCHETYPES = [ANY, ...[
   "price_sensitive",
   "premium_loyalist",

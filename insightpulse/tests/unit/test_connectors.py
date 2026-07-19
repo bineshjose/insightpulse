@@ -33,8 +33,8 @@ class TestCSVConnector:
 
     def test_panel_summary_counts(self):
         summary = CSVConnector().get_panel_summary()
-        assert summary["panelists"] == 500
-        assert summary["purchases"] == 10_000
+        assert summary["panelists"] == 2_560
+        assert summary["purchases"] == 27_520
         assert summary["source"] == "csv"
 
     def test_missing_file_raises(self, tmp_path):

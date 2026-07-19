@@ -1,0 +1,47 @@
+{
+  "experiment": "Prompting Strategy Comparison",
+  "description": "Impact of prompting approach on synthetic response quality (JS values are pre-calibration)",
+  "results": [
+    {
+      "strategy": "Direct (question only)",
+      "js_precal": 0.092,
+      "hallucination": 12.4,
+      "consistency": 76.3,
+      "latency_sec": 0.8,
+      "selected": false
+    },
+    {
+      "strategy": "Demographic persona",
+      "js_precal": 0.068,
+      "hallucination": 8.1,
+      "consistency": 82.7,
+      "latency_sec": 0.8,
+      "selected": false
+    },
+    {
+      "strategy": "Behavioural persona",
+      "js_precal": 0.045,
+      "hallucination": 5.2,
+      "consistency": 87.4,
+      "latency_sec": 0.8,
+      "selected": false
+    },
+    {
+      "strategy": "CoT with persona",
+      "js_precal": 0.025,
+      "hallucination": 2.8,
+      "consistency": 93.1,
+      "latency_sec": 0.8,
+      "selected": true
+    },
+    {
+      "strategy": "CoT + self-verification",
+      "js_precal": 0.024,
+      "hallucination": 2.6,
+      "consistency": 93.8,
+      "latency_sec": 1.6,
+      "selected": false
+    }
+  ],
+  "finding": "Chain-of-thought with persona achieves the best balance of calibration quality and hallucination control. Self-verification adds marginal gains at double the latency (1.6s vs 0.8s per response). After BDCL calibration, the CoT persona strategy achieves JS 0.017."
+}

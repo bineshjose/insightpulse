@@ -3,15 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Settings, User as UserIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { getHealth } from "@/lib/api";
+import { ModeBadge, useMode } from "@/components/common/mode-indicator";
 import { useAuth } from "@/lib/auth";
 import { formatNumber } from "@/lib/utils";
 
@@ -27,18 +25,12 @@ const CRUMB_LABELS: Record<string, string> = {
   profile: "Profile",
 };
 
-/** Top bar: breadcrumbs, environment badge, credit pill, user menu. */
+/** Top bar: breadcrumbs, operational-mode badge, credit pill, user menu. */
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [env, setEnv] = useState<string | null>(null);
-
-  useEffect(() => {
-    getHealth()
-      .then((health) => setEnv(health.env))
-      .catch(() => setEnv(null));
-  }, []);
+  const mode = useMode();
 
   const segment = pathname.split("/")[1] ?? "";
   const crumb = CRUMB_LABELS[segment] ?? "Dashboard";
@@ -54,15 +46,7 @@ export function Header() {
       </nav>
 
       <div className="flex items-center gap-3">
-        {env !== null ? (
-          <Badge variant={env === "production" ? "red" : "green"}>
-            {env === "production" ? "Live" : "Demo"}
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="border-niq-navy text-niq-navy">
-            Local Mode
-          </Badge>
-        )}
+        <ModeBadge mode={mode} />
         {user && (
           <span className="rounded-full border border-niq-border bg-niq-bg px-3 py-1 text-xs font-semibold text-niq-navy">
             {formatNumber(user.creditsBalance)} credits

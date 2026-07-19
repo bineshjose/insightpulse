@@ -1,13 +1,15 @@
 """LangGraph orchestration DAG for the synthetic survey pipeline.
 
-This module wires the 8 specialized agents into a directed acyclic graph
+This module wires the specialized agents into a directed acyclic graph
 using LangGraph's StateGraph. The graph defines:
 
     1. Linear flow: SurveyDesigner → CohortSelector → TwinOrchestrator →
-       Validator → CalibrationAgent → DiversityMonitor → AuditAgent
+       Validator → RedTeamAgent → CalibrationAgent → DiversityMonitor →
+       AuditAgent
 
     2. Conditional edges:
-       - Validator → TwinOrchestrator (retry if validation fails)
+       - RedTeamAgent → TwinOrchestrator (retry when either the Validator
+         or the adversarial screen flags too many responses)
        - DiversityMonitor → TwinOrchestrator (retry if entropy too low)
        - CostAgent checks run concurrently and can halt the pipeline
 
@@ -34,6 +36,7 @@ from insightpulse.agents.calibration_agent import calibration_agent_node
 from insightpulse.agents.cohort_selector import cohort_selector_node
 from insightpulse.agents.cost_agent import cost_agent_node
 from insightpulse.agents.diversity_monitor import diversity_monitor_node
+from insightpulse.agents.red_team import red_team_node
 from insightpulse.agents.survey_designer import survey_designer_node
 from insightpulse.agents.twin_orchestrator import twin_orchestrator_node
 from insightpulse.agents.validator import validator_node
@@ -166,6 +169,7 @@ def build_survey_pipeline() -> StateGraph:
         "twin_orchestrator", trace_agent("TwinOrchestrator")(twin_orchestrator_node)
     )
     workflow.add_node("validator", trace_agent("Validator")(validator_node))
+    workflow.add_node("red_team", trace_agent("RedTeamAgent")(red_team_node))
     workflow.add_node("cost_check", trace_agent("CostAgent")(cost_agent_node))
     workflow.add_node(
         "calibration_agent", trace_agent("CalibrationAgent")(calibration_agent_node)
@@ -187,9 +191,15 @@ def build_survey_pipeline() -> StateGraph:
     workflow.add_edge("cohort_selector", "twin_orchestrator")
     workflow.add_edge("twin_orchestrator", "validator")
 
-    # Conditional: Validator → regenerate or continue
+    # Validator hands off to the red-team screen; the regenerate decision
+    # runs after BOTH lines of defence, so responses flagged by either
+    # trigger the same retry loop (thesis §4.5.15: red-team rejections
+    # regenerate regardless of the primary Validator's verdict).
+    workflow.add_edge("validator", "red_team")
+
+    # Conditional: RedTeamAgent → regenerate or continue
     workflow.add_conditional_edges(
-        "validator",
+        "red_team",
         should_regenerate,
         {
             "regenerate": "twin_orchestrator",
@@ -223,7 +233,7 @@ def build_survey_pipeline() -> StateGraph:
     # Terminal: AuditAgent → END
     workflow.add_edge("audit_agent", END)
 
-    logger.info("survey_pipeline_built", nodes=8, edges=9)
+    logger.info("survey_pipeline_built", nodes=9, edges=10)
 
     return workflow
 

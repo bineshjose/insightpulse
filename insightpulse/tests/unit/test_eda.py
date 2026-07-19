@@ -33,13 +33,13 @@ def purchases() -> pd.DataFrame:
 class TestPanelistAnalyzer:
     def test_summary_matches_panel(self, panel):
         summary = PanelistAnalyzer(panel).summary()
-        assert summary["total_households"] == 500
-        assert summary["regions_covered"] == 4
+        assert summary["total_households"] == 2_560
+        assert summary["regions_covered"] == 8
 
     def test_age_distribution_ordered_and_complete(self, panel):
         age = PanelistAnalyzer(panel).age_distribution()
         assert age["labels"][0] == "18-24" and age["labels"][-1] == "65+"
-        assert sum(age["counts"]) == 500
+        assert sum(age["counts"]) == 2_560
         assert abs(sum(age["shares"]) - 1.0) < 0.01
 
     def test_crosstab_shape(self, panel):
@@ -51,7 +51,7 @@ class TestPanelistAnalyzer:
 class TestPurchaseAnalyzer:
     def test_summary(self, purchases):
         summary = PurchaseAnalyzer(purchases).summary()
-        assert summary["total_transactions"] == 10_000
+        assert summary["total_transactions"] == 27_520
         assert 0 < summary["promotion_rate"] < 1
 
     def test_penetration_bounded(self, purchases):
@@ -60,8 +60,8 @@ class TestPurchaseAnalyzer:
 
     def test_monthly_volume_covers_year(self, purchases):
         monthly = PurchaseAnalyzer(purchases).monthly_volume()
-        assert len(monthly["labels"]) == 12
-        assert sum(monthly["counts"]) == 10_000
+        assert len(monthly["labels"]) == 21  # Oct 2024 - Jun 2026
+        assert sum(monthly["counts"]) == 27_520
 
 
 class TestClusterAnalyzer:
@@ -84,7 +84,7 @@ class TestSurveyAnalyzer:
     def test_summary(self):
         responses = pd.read_csv("data/demo/survey_responses.csv")
         summary = SurveyAnalyzer(responses).summary()
-        assert summary["total_responses"] == 2_500
+        assert summary["total_responses"] == 12_800
         assert summary["questions"] == 5
 
 

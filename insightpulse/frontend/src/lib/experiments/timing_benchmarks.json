@@ -1,0 +1,78 @@
+{
+  "experiment": "Training and Inference Time Benchmarks",
+  "hardware": "Azure D4s_v3 (4 vCPU, 16 GB RAM)",
+  "throughput_per_min": 1248,
+  "results": [
+    {
+      "component": "Behavioural encoder training",
+      "time_display": "45 min",
+      "time_seconds": 2700,
+      "category": "training",
+      "hardware_note": "CPU only (1.2M params)"
+    },
+    {
+      "component": "K-Means clustering (K=5)",
+      "time_display": "12 sec",
+      "time_seconds": 12,
+      "category": "training",
+      "hardware_note": "CPU, full panel"
+    },
+    {
+      "component": "FAISS index build (IVFFlat)",
+      "time_display": "3 sec",
+      "time_seconds": 3,
+      "category": "training",
+      "hardware_note": "CPU"
+    },
+    {
+      "component": "FAISS query (k=5)",
+      "time_display": "1.2 ms",
+      "time_seconds": 0.0012,
+      "category": "inference",
+      "hardware_note": "recall > 0.99 vs exact"
+    },
+    {
+      "component": "LLM generation per response",
+      "time_display": "0.8 sec",
+      "time_seconds": 0.8,
+      "category": "inference",
+      "hardware_note": "API call (Claude Sonnet)"
+    },
+    {
+      "component": "LLM generation per response (local)",
+      "time_display": "0.3 sec",
+      "time_seconds": 0.3,
+      "category": "inference",
+      "hardware_note": "Llama 3.1 8B via vLLM"
+    },
+    {
+      "component": "BDCL calibration per question",
+      "time_display": "2.1 sec",
+      "time_seconds": 2.1,
+      "category": "inference",
+      "hardware_note": "~80 Sinkhorn iterations"
+    },
+    {
+      "component": "Validation checks per response",
+      "time_display": "5 ms",
+      "time_seconds": 0.005,
+      "category": "inference",
+      "hardware_note": "rule-based"
+    },
+    {
+      "component": "End-to-end: 200 respondents x 10Q",
+      "time_display": "3.2 min",
+      "time_seconds": 192,
+      "category": "e2e",
+      "hardware_note": "Full pipeline"
+    },
+    {
+      "component": "End-to-end: 10,000 respondents x 10Q",
+      "time_display": "~8 min",
+      "time_seconds": 480,
+      "category": "e2e",
+      "hardware_note": "256-way async concurrency"
+    }
+  ],
+  "finding": "Throughput of 1,248 respondents/min for the full generation-validation-calibration cycle is achieved through 256-way asynchronous concurrency; no GPU is required outside the optional local-Llama path."
+}

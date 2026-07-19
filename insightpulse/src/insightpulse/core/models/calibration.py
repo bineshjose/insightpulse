@@ -42,6 +42,15 @@ class CalibrationInput(BaseModel):
         ),
     )
 
+    # Uncertainty-aware calibration (η, thesis §4.5.7): per-source-category
+    # uncertainty u_i in [0, 1]. When set and η > 0, the transport cost is
+    # scaled c'_ij = c_ij / (1 + η·u_i) so corrections concentrate where
+    # the generator was least committed.
+    source_uncertainty: list[float] | None = Field(
+        default=None,
+        description="Per-category generator uncertainty for cost scaling",
+    )
+
     # Demographic constraints: target marginals per group
     demographic_targets: dict[str, list[float]] | None = Field(
         default=None,

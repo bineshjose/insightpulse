@@ -95,9 +95,9 @@ def cohort() -> pd.DataFrame:
 class TestCSVRepository:
     async def test_loads_and_validates_all_datasets(self):
         repo = CSVRepository()
-        assert len(await repo.get_panelists()) == 500
-        assert len(await repo.get_purchases()) == 10_000
-        assert len(await repo.get_survey_responses()) == 2_500
+        assert len(await repo.get_panelists()) == 2_560
+        assert len(await repo.get_purchases()) == 27_520
+        assert len(await repo.get_survey_responses()) == 12_800
 
     async def test_missing_file_raises(self, tmp_path):
         repo = CSVRepository(data_dir=tmp_path)
@@ -207,7 +207,7 @@ class TestSQLRepository:
             config=DataLayerConfig(retry_attempts=1, retry_wait_seconds=0.0),
             fallback=CSVRepository(),
         )
-        assert len(await repo.get_panelists()) == 500  # served by fallback
+        assert len(await repo.get_panelists()) == 2_560  # served by fallback
 
     async def test_unreachable_db_without_fallback_raises(self):
         repo = SQLRepository(

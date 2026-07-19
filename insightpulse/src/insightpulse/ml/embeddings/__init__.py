@@ -16,10 +16,12 @@ from insightpulse.ml.embeddings.pipeline import (
     PrecomputedEmbeddingEngine,
 )
 from insightpulse.ml.embeddings.tokenizer import PurchaseTokenizer
+from insightpulse.ml.embeddings.trainer import ContrastiveTrainer
 
 __all__ = [
     "ClusterResult",
     "ClusteringEngine",
+    "ContrastiveTrainer",
     "DemographicEncoder",
     "EmbeddingEngine",
     "FAISSIndexManager",

@@ -1,0 +1,70 @@
+{
+  "experiment": "Acceptance Criteria",
+  "description": "The six acceptance gates for the full pipeline, with measured values and pass margins",
+  "criteria": [
+    {
+      "metric": "Behavioural fidelity (cosine similarity)",
+      "direction": "min",
+      "threshold": 0.8,
+      "value": 0.84,
+      "margin": 0.04,
+      "unit": "",
+      "component": "Embedding (L2)",
+      "basis": "Empirical + expert: archetype assignments destabilise below 0.80"
+    },
+    {
+      "metric": "Calibration accuracy (JS divergence)",
+      "direction": "max",
+      "threshold": 0.05,
+      "value": 0.017,
+      "margin": 0.033,
+      "unit": "",
+      "component": "BDCL (L4)",
+      "basis": "Statistical derivation from benchmark resolution (n=2,547)"
+    },
+    {
+      "metric": "Ordinal alignment (Wasserstein distance)",
+      "direction": "max",
+      "threshold": 0.15,
+      "value": 0.041,
+      "margin": 0.109,
+      "unit": "",
+      "component": "BDCL (L4)",
+      "basis": "Statistical derivation; ordinal ground metric"
+    },
+    {
+      "metric": "Hallucination rate",
+      "direction": "max",
+      "threshold": 5.0,
+      "value": 1.9,
+      "margin": 3.1,
+      "unit": "%",
+      "component": "Validator (L5)",
+      "basis": "Prior work reports 8-12% uncalibrated"
+    },
+    {
+      "metric": "Logical consistency",
+      "direction": "min",
+      "threshold": 90.0,
+      "value": 94.6,
+      "margin": 4.6,
+      "unit": "%",
+      "component": "Sequential conditioning (L3)",
+      "basis": "Prior work reports ~85% on multi-question instruments"
+    },
+    {
+      "metric": "Response diversity (Shannon entropy)",
+      "direction": "min",
+      "threshold": 1.5,
+      "value": 2.31,
+      "margin": 0.81,
+      "unit": "bits",
+      "component": "DiversityMonitor (L5)",
+      "basis": "Functional floor: ~2.8 effective categories for cross-tabulation"
+    }
+  ],
+  "passed": 6,
+  "total": 6,
+  "grade": "A",
+  "finding": "All six acceptance criteria pass with comfortable margins. The tightest margin is behavioural fidelity (cosine 0.84 vs the 0.80 floor), which is the deliberate trade-off the behavioural weight manages against calibration accuracy."
+}

@@ -38,8 +38,9 @@ def get_data_connector(env: Environment | None = None) -> PanelDataConnector:
     """Panel-data connector factory (Strategy pattern).
 
     Production resolves to :class:`SnowflakeConnector` when Snowflake is
-    configured; demo/test — and unconfigured production — resolve to
-    :class:`CSVConnector` over ``data/demo``.
+    configured; demo/api/test — and unconfigured production — resolve to
+    :class:`CSVConnector` over ``data/demo`` (api mode uses real LLMs but
+    keeps the synthetic panel).
 
     Args:
         env: Optional environment override (defaults to the profile's).

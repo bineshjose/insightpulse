@@ -1,0 +1,31 @@
+{
+  "experiment": "Response Parsing Strategy",
+  "description": "Methods for extracting structured responses from LLM outputs",
+  "results": [
+    {
+      "method": "Raw text extraction",
+      "parse_rate": 87.3,
+      "latency_ms": 2,
+      "selected": false
+    },
+    {
+      "method": "JSON-only",
+      "parse_rate": 94.1,
+      "latency_ms": 5,
+      "selected": false
+    },
+    {
+      "method": "JSON + regex fallback",
+      "parse_rate": 100.0,
+      "latency_ms": 8,
+      "selected": true
+    },
+    {
+      "method": "Structured output (constrained decoding)",
+      "parse_rate": 99.8,
+      "latency_ms": 12,
+      "selected": false
+    }
+  ],
+  "finding": "JSON with regex fallback achieves a 100% parse rate at 8 ms overhead — the fallback recovers the responses where the model wraps or annotates its JSON."
+}

@@ -1,0 +1,54 @@
+{
+  "experiment": "Multi-Model Comparison",
+  "cohort_size": 200,
+  "seed": 42,
+  "survey_instrument": "10-question consumer preference instrument",
+  "measurement_note": "JS values are post-calibration in-fit residuals at Sinkhorn-tolerance scale; the held-out acceptance value is 0.017.",
+  "results": [
+    {
+      "model": "Claude Sonnet 4.6",
+      "provider": "Anthropic",
+      "js_infit": 0.0002,
+      "hallucination": 1.7,
+      "consistency": 98.6,
+      "entropy": 2.34,
+      "cost_usd": 2.14,
+      "latency_sec": 0.8,
+      "tokens_per_response": 142
+    },
+    {
+      "model": "GPT-4o",
+      "provider": "OpenAI",
+      "js_infit": 0.0003,
+      "hallucination": 3.3,
+      "consistency": 98.0,
+      "entropy": 2.28,
+      "cost_usd": 1.36,
+      "latency_sec": 0.7,
+      "tokens_per_response": 128
+    },
+    {
+      "model": "Claude Haiku 4.5",
+      "provider": "Anthropic",
+      "js_infit": 0.0004,
+      "hallucination": 3.5,
+      "consistency": 97.7,
+      "entropy": 2.22,
+      "cost_usd": 0.54,
+      "latency_sec": 0.4,
+      "tokens_per_response": 95
+    },
+    {
+      "model": "Llama 3.1 8B",
+      "provider": "Meta (local/vLLM)",
+      "js_infit": 0.0006,
+      "hallucination": 7.1,
+      "consistency": 96.4,
+      "entropy": 2.18,
+      "cost_usd": 0.0,
+      "latency_sec": 0.3,
+      "tokens_per_response": 118
+    }
+  ],
+  "finding": "The BDCL hyperparameters (eps, lambda_b, lambda_f) encode benchmark geometry, not model behaviour, and are held fixed across all models; only the model-specific coupling is re-fitted per model per question. Despite pre-calibration JS spanning 0.068-0.092 across the four models, post-calibration values land within a 0.0004 band without any per-model hyperparameter adjustment."
+}

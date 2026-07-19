@@ -1,0 +1,52 @@
+{
+  "experiment": "Regularisation Parameter Sensitivity (eps)",
+  "description": "Entropic regularisation trade-off: alignment sharpness vs convergence speed and coupling smoothness",
+  "results": [
+    {
+      "epsilon": 0.01,
+      "js": 0.008,
+      "wasserstein": 0.018,
+      "iterations": 198,
+      "coupling_entropy": 0.42,
+      "stability": "Unstable",
+      "selected": false
+    },
+    {
+      "epsilon": 0.05,
+      "js": 0.012,
+      "wasserstein": 0.028,
+      "iterations": 142,
+      "coupling_entropy": 0.68,
+      "stability": "Stable",
+      "selected": false
+    },
+    {
+      "epsilon": 0.1,
+      "js": 0.017,
+      "wasserstein": 0.041,
+      "iterations": 80,
+      "coupling_entropy": 0.91,
+      "stability": "Stable",
+      "selected": true
+    },
+    {
+      "epsilon": 0.5,
+      "js": 0.032,
+      "wasserstein": 0.074,
+      "iterations": 28,
+      "coupling_entropy": 1.52,
+      "stability": "Stable",
+      "selected": false
+    },
+    {
+      "epsilon": 1.0,
+      "js": 0.048,
+      "wasserstein": 0.098,
+      "iterations": 12,
+      "coupling_entropy": 1.89,
+      "stability": "Stable",
+      "selected": false
+    }
+  ],
+  "finding": "eps=0.01 achieves the lowest JS (0.008) but differences below ~0.01 lie within the benchmark's sampling noise, and its coupling entropy (0.42) indicates an overly sharp transport plan. eps=0.1 achieves JS well within the acceptance threshold with a smoother coupling and faster convergence."
+}

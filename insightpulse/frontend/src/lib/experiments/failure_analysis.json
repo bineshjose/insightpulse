@@ -1,0 +1,31 @@
+{
+  "experiment": "Qualitative Failure Analysis",
+  "description": "Structure of the residual 1.9% hallucination rate: four failure modes, each with an identifiable mechanism",
+  "failure_modes": [
+    {
+      "type": "Demographic stereotyping",
+      "rate_pct": 0.7,
+      "mechanism": "Coincidental alignment: an injected stereotype-priming perturbation elicits a response matching what the behavioural profile would have predicted anyway",
+      "mitigation": "Counterfactual probing (doubles generation cost)"
+    },
+    {
+      "type": "Brand hallucination",
+      "rate_pct": 0.6,
+      "mechanism": "Plausible portmanteaus: invented brand names composed from morphemes common in the category slip past verbatim checks",
+      "mitigation": "Validator brand-lexicon check"
+    },
+    {
+      "type": "Temporal inconsistency",
+      "rate_pct": 0.4,
+      "mechanism": "Boundary artefacts from fiscal-to-calendar week realignment rather than gross anachronisms",
+      "mitigation": "Date-aware prompt constraints"
+    },
+    {
+      "type": "Prompt leakage",
+      "rate_pct": 0.2,
+      "mechanism": "Paraphrased leakage: fragments of persona instructions surface reworded in open-text responses (verbatim leakage is caught essentially always)",
+      "mitigation": "ResponseGuard structural check"
+    }
+  ],
+  "finding": "The residual 1.9% is a structured set of failure modes, each with an identifiable mechanism and a known detection cost. Every surviving failure mode lives at a boundary, suggesting the next material quality gains lie in sharper boundary definitions rather than stronger models."
+}

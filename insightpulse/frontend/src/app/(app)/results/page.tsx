@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { LATEST_RUN, formatRunDate, loadLastRun } from "@/lib/demo-data";
+import { HISTORICAL_RUNS, LATEST_RUN, formatRunDate, loadLastRun } from "@/lib/demo-data";
 import { formatPercent } from "@/lib/utils";
 import type { SurveyRunResponse } from "@/lib/types";
 
@@ -31,7 +31,7 @@ function runLabel(run: SurveyRunResponse): string {
  */
 export default function ResultsPage() {
   const [liveRun, setLiveRun] = useState<SurveyRunResponse | null>(null);
-  const [selected, setSelected] = useState<"live" | "latest">("latest");
+  const [selected, setSelected] = useState<string>("latest");
 
   useEffect(() => {
     const stored = loadLastRun();
@@ -41,7 +41,9 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const run = selected === "live" && liveRun ? liveRun : LATEST_RUN;
+  const archived = HISTORICAL_RUNS.find((entry) => entry.run_id === selected);
+  const run =
+    selected === "live" && liveRun ? liveRun : archived ?? LATEST_RUN;
   const result = run.results[0];
   const meta = run.metadata;
 
@@ -64,6 +66,7 @@ export default function ResultsPage() {
   const runOptions = [
     ...(liveRun ? [{ value: "live", label: runLabel(liveRun) }] : []),
     { value: "latest", label: runLabel(LATEST_RUN) },
+    ...HISTORICAL_RUNS.map((entry) => ({ value: entry.run_id, label: runLabel(entry) })),
   ];
 
   return (
@@ -95,7 +98,7 @@ export default function ResultsPage() {
             className="w-72"
             options={runOptions}
             value={selected}
-            onChange={(event) => setSelected(event.target.value as "live" | "latest")}
+            onChange={(event) => setSelected(event.target.value)}
           />
           <ExportButton filename={`run_${run.run_id}_results`} data={run.results} format="json" />
           <ExportButton

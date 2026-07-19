@@ -1,0 +1,43 @@
+{
+  "experiment": "Fine-Tuning vs Prompt Conditioning",
+  "description": "Systematic comparison of domain adaptation strategies for survey response generation",
+  "results": [
+    {
+      "method": "Full fine-tuning",
+      "js": 0.016,
+      "hallucination": 2.1,
+      "cost_usd": 196,
+      "train_hours": 8.2,
+      "gpu_required": true,
+      "selected": false
+    },
+    {
+      "method": "LoRA (r=16)",
+      "js": 0.018,
+      "hallucination": 2.4,
+      "cost_usd": 48,
+      "train_hours": 2.1,
+      "gpu_required": true,
+      "selected": false
+    },
+    {
+      "method": "QLoRA (r=16, 4-bit)",
+      "js": 0.021,
+      "hallucination": 2.9,
+      "cost_usd": 12,
+      "train_hours": 0.8,
+      "gpu_required": true,
+      "selected": false
+    },
+    {
+      "method": "Prompt conditioning (ours)",
+      "js": 0.017,
+      "hallucination": 1.9,
+      "cost_usd": 0,
+      "train_hours": 0.0,
+      "gpu_required": false,
+      "selected": true
+    }
+  ],
+  "finding": "Prompt conditioning with behavioural context achieves JS within 0.005 of full fine-tuning at zero training cost, validating the model-agnostic generation paradigm: behavioural knowledge resides in the conditioning prompt and calibration layer rather than in adapted model weights."
+}

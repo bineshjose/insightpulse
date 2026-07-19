@@ -1,0 +1,47 @@
+{
+  "experiment": "Embedding Dimension Sweep",
+  "description": "Impact of embedding dimensionality on representation quality and computational cost",
+  "results": [
+    {
+      "dim": 32,
+      "js_downstream": 0.031,
+      "silhouette": 0.34,
+      "index_mb": 4.8,
+      "training_min": 22,
+      "selected": false
+    },
+    {
+      "dim": 64,
+      "js_downstream": 0.023,
+      "silhouette": 0.39,
+      "index_mb": 9.6,
+      "training_min": 32,
+      "selected": false
+    },
+    {
+      "dim": 128,
+      "js_downstream": 0.017,
+      "silhouette": 0.42,
+      "index_mb": 19.2,
+      "training_min": 45,
+      "selected": true
+    },
+    {
+      "dim": 256,
+      "js_downstream": 0.016,
+      "silhouette": 0.41,
+      "index_mb": 38.4,
+      "training_min": 68,
+      "selected": false
+    },
+    {
+      "dim": 512,
+      "js_downstream": 0.018,
+      "silhouette": 0.38,
+      "index_mb": 76.8,
+      "training_min": 112,
+      "selected": false
+    }
+  ],
+  "finding": "d=128 achieves the lowest practically distinguishable JS divergence; d=256 offers a marginal 0.001 improvement that lies within the benchmark's resolution while doubling the index size and adding 51% training time."
+}

@@ -1,0 +1,29 @@
+{
+  "experiment": "BDCL Calibration Impact",
+  "description": "Distribution divergence before and after BDCL calibration, averaged across the 10-question evaluation instrument",
+  "results": {
+    "before": {
+      "js": 0.078,
+      "wasserstein": 0.136,
+      "hallucination": 7.8,
+      "consistency": 81.2,
+      "entropy": 1.89,
+      "max_category_deviation_pp": 8.1
+    },
+    "after": {
+      "js": 0.017,
+      "wasserstein": 0.041,
+      "hallucination": 1.9,
+      "consistency": 94.6,
+      "entropy": 2.31,
+      "max_category_deviation_pp": 0.3
+    },
+    "improvement": {
+      "js_reduction_pct": 78,
+      "wasserstein_reduction_pct": 70,
+      "hallucination_reduction_pct": 76,
+      "max_deviation_reduction_pct": 96
+    }
+  },
+  "finding": "BDCL contributes a 78% reduction in JS divergence. Post-calibration per-category deviations (0.3 pp) sit an order of magnitude below the benchmark's own sampling uncertainty (±3.2 pp), so the calibrated distribution is statistically indistinguishable from the target population distribution at the resolution the benchmark affords."
+}

@@ -20,7 +20,11 @@ _HOUSEHOLD_ORDER = ["1", "2", "3-4", "5+"]
 _EDUCATION_ORDER = [
     "high_school", "some_college", "bachelors", "masters", "doctorate",
 ]
-_REGIONS = ["northeast", "midwest", "south", "west", "urban", "suburban", "rural"]
+_REGIONS = [
+    "northeast", "mid_atlantic", "southeast", "south",
+    "midwest", "mountain", "west", "pacific",
+    "urban", "suburban", "rural",
+]
 _EMPLOYMENT = ["employed", "unemployed", "retired", "student"]
 
 

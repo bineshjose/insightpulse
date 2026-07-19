@@ -1,0 +1,35 @@
+{
+  "experiment": "Purchase History Chunking Strategy",
+  "description": "Impact of temporal window size on embedding quality and downstream calibration accuracy",
+  "results": [
+    {
+      "strategy": "30-day window",
+      "js_downstream": 0.024,
+      "silhouette": 0.39,
+      "sequences_per_household": 12.4,
+      "selected": false
+    },
+    {
+      "strategy": "60-day window",
+      "js_downstream": 0.017,
+      "silhouette": 0.42,
+      "sequences_per_household": 6.2,
+      "selected": true
+    },
+    {
+      "strategy": "90-day window",
+      "js_downstream": 0.019,
+      "silhouette": 0.4,
+      "sequences_per_household": 4.1,
+      "selected": false
+    },
+    {
+      "strategy": "Last 50 transactions",
+      "js_downstream": 0.022,
+      "silhouette": 0.37,
+      "sequences_per_household": null,
+      "selected": false
+    }
+  ],
+  "finding": "The 60-day window captures at least one full promotional cycle while remaining short enough to reflect current preferences. The 30-day window produces more sequences per household but each carries weaker behavioural signal; the 90-day window dilutes recent preferences with stale purchase history."
+}

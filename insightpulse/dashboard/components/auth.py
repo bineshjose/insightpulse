@@ -500,9 +500,13 @@ def render_sidebar(user: dict[str, Any]) -> None:
         )
         st.divider()
 
-        env = os.getenv("ENV", "demo")
-        env_dot = "🟢" if env == "demo" else "🔴"
-        env_label = "Demo Mode" if env == "demo" else "Live Mode"
+        env = os.getenv("ENV", "demo").lower()
+        if env == "api":
+            env_dot, env_label = "🔵", "API Mode"
+        elif env in ("prod", "production"):
+            env_dot, env_label = "🟢", "Production Mode"
+        else:
+            env_dot, env_label = "🔷", "Prod API - Offline"
         api_url = os.getenv("API_URL", "http://localhost:8000")
         api_ok = _api_healthy(api_url)
         api_dot = "🟢" if api_ok else "🔷"

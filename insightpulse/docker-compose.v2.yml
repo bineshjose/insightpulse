@@ -1,0 +1,92 @@
+# =============================================================================
+# InsightPulse v2 — Parallel Deployment (runs ALONGSIDE the existing stack)
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.v2.yml up -d --build
+#
+# Fully isolated from the base deployment: its own compose project name,
+# container names, network, volume, and host ports (demo-mode port block:
+# API 8010, Streamlit 8511, React 3010). Never stops or modifies the
+# containers started from docker-compose.yml.
+# =============================================================================
+
+name: insightpulse-v2
+
+services:
+  # ---------------------------------------------------------------------------
+  # Core Application — FastAPI + LangGraph Agent Orchestration
+  # ---------------------------------------------------------------------------
+  insightpulse-v2-app:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.app
+    container_name: insightpulse-v2-app
+    environment:
+      - ENV=demo
+      - PYTHONPATH=/app/src
+    ports:
+      - "8010:8000"
+    volumes:
+      - ./data/demo:/app/data/demo:ro
+      - v2-app-data:/app/storage
+    networks:
+      - insightpulse-v2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Dashboard — Streamlit UI (analyst interface)
+  # ---------------------------------------------------------------------------
+  insightpulse-v2-dashboard:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.dashboard
+    container_name: insightpulse-v2-dashboard
+    environment:
+      - ENV=demo
+      - API_URL=http://insightpulse-v2-app:8000
+      - PYTHONPATH=/app/src
+    ports:
+      - "8511:8501"
+    volumes:
+      - ./data/demo:/app/data/demo:ro
+    depends_on:
+      insightpulse-v2-app:
+        condition: service_healthy
+    networks:
+      - insightpulse-v2
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Next.js production UI (React)
+  # ---------------------------------------------------------------------------
+  insightpulse-v2-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: insightpulse-v2-frontend
+    environment:
+      # Server-side rewrite target: the Next server proxies /api/backend/*
+      # to the app container over the compose network.
+      - NEXT_PUBLIC_API_URL=http://insightpulse-v2-app:8000
+    ports:
+      - "3010:3000"
+    depends_on:
+      insightpulse-v2-app:
+        condition: service_healthy
+    networks:
+      - insightpulse-v2
+    restart: unless-stopped
+
+networks:
+  insightpulse-v2:
+    name: insightpulse-v2-network
+
+volumes:
+  v2-app-data:
+    driver: local

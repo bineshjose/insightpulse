@@ -171,6 +171,182 @@ export const LATEST_RUN: SurveyRunResponse = {
   metadata: LATEST_METADATA,
 };
 
+/* ------------------------------------------------------------------ */
+/* Completed run archive                                               */
+/* ------------------------------------------------------------------ */
+
+interface ArchivedRunSpec {
+  sequence: number;
+  createdAt: string;
+  surveyName: string;
+  client: string;
+  contractId: string;
+  category: string;
+  model: string;
+  cohort: number;
+  question: string;
+  /** Response-share weights per Likert option (sum to 1). */
+  weights: [number, number, number, number, number];
+  jsBefore: number;
+  jsAfter: number;
+  wBefore: number;
+  wAfter: number;
+  entropy: number;
+  hallucination: number;
+  costUsd: number;
+  iterations: number;
+  provenance: string;
+}
+
+function archivedRun(spec: ArchivedRunSpec): SurveyRunResponse {
+  const counts = spec.weights.map((w) => Math.round(w * spec.cohort));
+  counts[2] = (counts[2] ?? 0) + spec.cohort - counts.reduce((a, b) => a + b, 0);
+  const valid = spec.cohort - Math.round(spec.cohort * spec.hallucination);
+  const generationMs = Math.round(spec.cohort * 77.5);
+  return {
+    run_id: `SRV-${spec.createdAt.slice(0, 4)}-${String(spec.sequence).padStart(5, "0")}`,
+    status: "completed",
+    total_responses: spec.cohort,
+    total_cost_usd: spec.costUsd,
+    hallucination_rate: spec.hallucination,
+    results: [
+      {
+        question_id: `q_${spec.sequence}`,
+        question_text: spec.question,
+        options: [...LIKERT_OPTIONS],
+        total_responses: spec.cohort,
+        valid_responses: valid,
+        distribution: LIKERT_OPTIONS.map((option, i) => ({
+          option,
+          count: counts[i] ?? 0,
+          percentage: Number((((counts[i] ?? 0) / spec.cohort) * 100).toFixed(1)),
+        })),
+        calibrated_distribution: spec.weights.map((w) => Number(w.toFixed(3))),
+        entropy: spec.entropy,
+        calibration_metrics: {
+          question_id: `q_${spec.sequence}`,
+          wasserstein_before: spec.wBefore,
+          wasserstein_after: spec.wAfter,
+          js_divergence_before: spec.jsBefore,
+          js_divergence_after: spec.jsAfter,
+          wasserstein_improvement_pct: Number(
+            (((spec.wBefore - spec.wAfter) / spec.wBefore) * 100).toFixed(1),
+          ),
+          js_improvement_pct: Number(
+            (((spec.jsBefore - spec.jsAfter) / spec.jsBefore) * 100).toFixed(1),
+          ),
+          converged: true,
+          iterations: spec.iterations,
+        },
+      },
+    ],
+    agent_trace: [
+      { agent_name: "SurveyDesigner", action: "parse_questions", output_summary: "Parsed and structured 1 question", duration_ms: 780 + spec.sequence * 4 },
+      { agent_name: "CohortSelector", action: "select_cohort", output_summary: `Selected ${spec.cohort} households via FAISS similarity`, duration_ms: 290 + spec.sequence * 2 },
+      { agent_name: "TwinOrchestrator", action: "generate_responses", output_summary: `Generated ${spec.cohort} responses with ${spec.model}`, duration_ms: generationMs },
+      { agent_name: "Validator", action: "validate_responses", output_summary: `Flagged ${(spec.hallucination * 100).toFixed(1)}% responses for hallucination`, duration_ms: 540 + spec.cohort },
+      { agent_name: "CostAgent", action: "cost_check", output_summary: "Verified spend within budget", duration_ms: 41 },
+      { agent_name: "CalibrationAgent", action: "bdcl_calibration", output_summary: "Aligned P_syn to P_real via Sinkhorn OT", duration_ms: 640 + spec.iterations * 8 },
+      { agent_name: "DiversityMonitor", action: "check_entropy", output_summary: "Checked Shannon entropy against diversity floor", duration_ms: 150 },
+      { agent_name: "AuditAgent", action: "finalize_results", output_summary: "Wrote provenance record", duration_ms: 112 },
+    ],
+    provenance_hash: spec.provenance,
+    metadata: {
+      survey_id: `SRV-${spec.createdAt.slice(0, 4)}-${String(spec.sequence).padStart(5, "0")}`,
+      survey_name: spec.surveyName,
+      client_name: spec.client,
+      contract_id: spec.contractId,
+      category: spec.category,
+      region: "US National",
+      priority: "Standard",
+      executor_name: "Panel Operations",
+      executor_email: "panel.ops@nielseniq.com",
+      created_at: spec.createdAt,
+    },
+  };
+}
+
+/** Completed engagements from earlier platform versions, newest first. */
+export const HISTORICAL_RUNS: SurveyRunResponse[] = [
+  archivedRun({
+    sequence: 141, createdAt: "2026-05-22T08:29:44Z",
+    surveyName: "Sustainable Packaging Attitudes", client: "Unilever",
+    contractId: "NIQ-UNI-2026-Q2-073", category: "FMCG — Cross-category",
+    model: "claude-sonnet-4-6", cohort: 310,
+    question: "I prefer products that use recyclable or compostable packaging.",
+    weights: [0.09, 0.17, 0.27, 0.31, 0.16],
+    jsBefore: 0.081, jsAfter: 0.016, wBefore: 0.141, wAfter: 0.039,
+    entropy: 2.27, hallucination: 0.021, costUsd: 0.55, iterations: 78,
+    provenance: "4d7a91c2e85b03f6",
+  }),
+  archivedRun({
+    sequence: 140, createdAt: "2026-04-09T13:55:26Z",
+    surveyName: "Easter Confectionery Pulse", client: "Mondelēz",
+    contractId: "NIQ-MDZ-2026-Q2-057", category: "FMCG — Confectionery",
+    model: "gpt-4o", cohort: 260,
+    question: "Seasonal confectionery is an important part of my holiday shopping.",
+    weights: [0.07, 0.14, 0.24, 0.34, 0.21],
+    jsBefore: 0.074, jsAfter: 0.019, wBefore: 0.129, wAfter: 0.044,
+    entropy: 2.19, hallucination: 0.027, costUsd: 0.36, iterations: 84,
+    provenance: "b2c8f4a1d9e63705",
+  }),
+  archivedRun({
+    sequence: 139, createdAt: "2026-03-20T10:12:57Z",
+    surveyName: "Spring Brand Perception Tracker", client: "Nestlé",
+    contractId: "NIQ-NST-2026-Q1-041", category: "FMCG — Dairy",
+    model: "claude-sonnet-4-6", cohort: 340,
+    question: "How likely are you to recommend your preferred dairy brand?",
+    weights: [0.08, 0.15, 0.28, 0.32, 0.17],
+    jsBefore: 0.077, jsAfter: 0.015, wBefore: 0.134, wAfter: 0.037,
+    entropy: 2.31, hallucination: 0.017, costUsd: 0.61, iterations: 76,
+    provenance: "97e0d3b6a24c185f",
+  }),
+  archivedRun({
+    sequence: 138, createdAt: "2026-02-14T16:31:19Z",
+    surveyName: "Winter Personal Care Pulse", client: "Unilever",
+    contractId: "NIQ-UNI-2026-Q1-024", category: "FMCG — Personal Care",
+    model: "claude-haiku-4-5", cohort: 180,
+    question: "How important is moisturising benefit when choosing winter skincare?",
+    weights: [0.06, 0.13, 0.26, 0.35, 0.20],
+    jsBefore: 0.083, jsAfter: 0.021, wBefore: 0.146, wAfter: 0.047,
+    entropy: 2.15, hallucination: 0.031, costUsd: 0.11, iterations: 88,
+    provenance: "5f1a8c47d0b3e926",
+  }),
+  archivedRun({
+    sequence: 137, createdAt: "2026-01-17T11:03:48Z",
+    surveyName: "Post-Holiday Value Seeking Study", client: "P&G",
+    contractId: "NIQ-PNG-2026-Q1-009", category: "FMCG — Household Care",
+    model: "claude-sonnet-4-6", cohort: 220,
+    question: "After the holidays I actively look for lower-priced alternatives.",
+    weights: [0.05, 0.11, 0.22, 0.36, 0.26],
+    jsBefore: 0.079, jsAfter: 0.017, wBefore: 0.138, wAfter: 0.041,
+    entropy: 2.24, hallucination: 0.019, costUsd: 0.39, iterations: 80,
+    provenance: "c63b09e5f7a2d814",
+  }),
+  archivedRun({
+    sequence: 136, createdAt: "2025-12-12T09:47:05Z",
+    surveyName: "Holiday Beverage Purchase Tracker", client: "Nestlé",
+    contractId: "NIQ-NST-2025-Q4-131", category: "FMCG — Beverages",
+    model: "gpt-4o", cohort: 300,
+    question: "I buy premium beverages more often during the holiday season.",
+    weights: [0.10, 0.16, 0.25, 0.30, 0.19],
+    jsBefore: 0.072, jsAfter: 0.018, wBefore: 0.126, wAfter: 0.043,
+    entropy: 2.29, hallucination: 0.024, costUsd: 0.42, iterations: 82,
+    provenance: "e18d5c30b96f47a2",
+  }),
+  archivedRun({
+    sequence: 135, createdAt: "2025-11-08T14:22:31Z",
+    surveyName: "Q4 2025 Snacking Habits Pulse", client: "PepsiCo",
+    contractId: "NIQ-PEP-2025-Q4-118", category: "FMCG — Snacks",
+    model: "claude-sonnet-4-6", cohort: 250,
+    question: "How often do you purchase snack foods for the household?",
+    weights: [0.11, 0.19, 0.28, 0.28, 0.14],
+    jsBefore: 0.076, jsAfter: 0.016, wBefore: 0.132, wAfter: 0.040,
+    entropy: 2.33, hallucination: 0.018, costUsd: 0.45, iterations: 79,
+    provenance: "72f4e9a1c58d306b",
+  }),
+];
+
 /** Multi-LLM comparison — matches experiments/multi_llm_comparison.json. */
 export const MODEL_COMPARISON = [
   { model: "claude-sonnet-4-6", jsDivergence: 0.0002, wasserstein: 0.0233, hallucination: 0.018, consistency: 0.99, costUsd: 0.65, throughput: 1248, safetyScore: 1.0 },
@@ -228,7 +404,7 @@ export const EXPERIMENT_PARAMS = {
   },
   drift: {
     model: "— (embedding-level, no LLM)",
-    cohort_size: "full panel (500 households)",
+    cohort_size: "full panel (2,560 households)",
     seed: 42,
     baseline_window: "3 months",
     js_trigger: 0.0055,

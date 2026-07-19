@@ -1,0 +1,43 @@
+{
+  "experiment": "Behavioural Weight Sensitivity (lambda_b)",
+  "description": "Trade-off between distributional alignment and behavioural-embedding preservation, 5-fold cross-validated",
+  "results": [
+    {
+      "lambda_b": 0.0,
+      "js": 0.012,
+      "cosine": 0.76,
+      "coupling": 0.41,
+      "cv_std": 0.004,
+      "note": "Cosine below 0.80 threshold",
+      "selected": false
+    },
+    {
+      "lambda_b": 0.1,
+      "js": 0.014,
+      "cosine": 0.8,
+      "coupling": 0.49,
+      "cv_std": 0.003,
+      "note": "",
+      "selected": false
+    },
+    {
+      "lambda_b": 0.3,
+      "js": 0.017,
+      "cosine": 0.84,
+      "coupling": 0.58,
+      "cv_std": 0.002,
+      "note": "Optimal trade-off",
+      "selected": true
+    },
+    {
+      "lambda_b": 0.5,
+      "js": 0.023,
+      "cosine": 0.86,
+      "coupling": 0.62,
+      "cv_std": 0.004,
+      "note": "Over-regularised",
+      "selected": false
+    }
+  ],
+  "finding": "Without behavioural regularisation (lambda_b=0) the calibrator achieves the lowest JS but cosine similarity drops to 0.76, below the 0.80 acceptance threshold — unconstrained calibration destroys behavioural structure. lambda_b=0.3 preserves cosine at 0.84 while keeping JS well within bounds, and shows the lowest cross-validation variance."
+}

@@ -13,7 +13,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from components import auth, theme
+from components import auth, demo_engine, theme
 
 user = auth.require_page("home")
 
@@ -35,7 +35,7 @@ st.markdown(
 # otherwise
 # ---------------------------------------------------------------------------
 
-history = st.session_state.get("run_history", [])
+history = demo_engine.ensure_seeded_history()
 if history:
     last = history[-1]
     js_values = [

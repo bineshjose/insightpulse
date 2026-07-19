@@ -1,0 +1,60 @@
+{
+  "experiment": "Temporal Drift Detection",
+  "description": "Weekly JS-divergence checks on a fixed probe cohort, shown as monthly aggregates (Oct 2025 - Jun 2026)",
+  "threshold": 0.01,
+  "formula": "tau = max(mu + 2*sigma, 0.01) — noise-floor derived",
+  "monthly_drift": [
+    {
+      "month": "Oct 2025",
+      "js_drift": 0.004,
+      "annotation": null
+    },
+    {
+      "month": "Nov 2025",
+      "js_drift": 0.003,
+      "annotation": null
+    },
+    {
+      "month": "Dec 2025",
+      "js_drift": 0.005,
+      "annotation": "Holiday season"
+    },
+    {
+      "month": "Jan 2026",
+      "js_drift": 0.007,
+      "annotation": "Post-holiday normalisation"
+    },
+    {
+      "month": "Feb 2026",
+      "js_drift": 0.006,
+      "annotation": null
+    },
+    {
+      "month": "Mar 2026",
+      "js_drift": 0.003,
+      "annotation": null
+    },
+    {
+      "month": "Apr 2026",
+      "js_drift": 0.004,
+      "annotation": null
+    },
+    {
+      "month": "May 2026",
+      "js_drift": 0.008,
+      "annotation": "Seasonal category shift"
+    },
+    {
+      "month": "Jun 2026",
+      "js_drift": 0.005,
+      "annotation": null
+    }
+  ],
+  "triggered": false,
+  "retraining_pipeline": [
+    "Re-encode embeddings",
+    "Re-fit K-Means clusters",
+    "Re-calibrate BDCL weights"
+  ],
+  "finding": "Across nine months including a holiday season, weekly JS drift fluctuated between 0.003 and 0.008 (mean 0.005, sigma 0.0015) and never crossed the 0.01 alert threshold — the behavioural embedding space remained valid, supporting the annual encoder retraining cadence with per-run BDCL re-fitting absorbing day-to-day variation."
+}

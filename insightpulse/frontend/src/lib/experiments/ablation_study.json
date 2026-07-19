@@ -1,0 +1,63 @@
+{
+  "experiment": "Component Ablation Study",
+  "description": "Impact of removing individual pipeline components from the full system",
+  "results": [
+    {
+      "config": "Full pipeline",
+      "js": 0.017,
+      "hallucination": 1.9,
+      "consistency": 94.6,
+      "entropy": 2.31,
+      "note": "Complete system — baseline"
+    },
+    {
+      "config": "Without BDCL calibration",
+      "js": 0.078,
+      "hallucination": 4.2,
+      "consistency": 88.4,
+      "entropy": 1.89,
+      "note": "Largest single impact — 78% of the JS improvement"
+    },
+    {
+      "config": "Without behavioural embeddings",
+      "js": 0.045,
+      "hallucination": 4.1,
+      "consistency": 89.3,
+      "entropy": 2.14,
+      "note": "Demographics-only conditioning"
+    },
+    {
+      "config": "Without sequential conditioning",
+      "js": 0.017,
+      "hallucination": 1.9,
+      "consistency": 84.8,
+      "entropy": 2.31,
+      "note": "-9.8 pp consistency"
+    },
+    {
+      "config": "Without Validator agent",
+      "js": 0.017,
+      "hallucination": 5.4,
+      "consistency": 88.4,
+      "entropy": 2.31,
+      "note": "+3.5 pp hallucination leak"
+    },
+    {
+      "config": "Without fairness constraints",
+      "js": 0.015,
+      "hallucination": 1.9,
+      "consistency": 94.6,
+      "entropy": 2.31,
+      "note": "Group deviation rises to 4.2 pp"
+    },
+    {
+      "config": "Without DiversityMonitor",
+      "js": 0.017,
+      "hallucination": 1.9,
+      "consistency": 94.6,
+      "entropy": 1.89,
+      "note": "Entropy approaches the 1.5-bit floor"
+    }
+  ],
+  "finding": "BDCL calibration is the single most impactful component (78% of the JS reduction). Behavioural embeddings contribute ~42% of the downstream quality improvement. The Validator catches 3.5 pp of hallucination; sequential conditioning contributes 9.8 pp of consistency; fairness constraints cost 0.002 JS but cap group deviation at 1.8 pp."
+}

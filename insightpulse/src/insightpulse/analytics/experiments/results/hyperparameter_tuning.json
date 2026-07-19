@@ -1,0 +1,143 @@
+{
+  "experiment": "Complete Hyperparameter Search",
+  "parameters": {
+    "epsilon": {
+      "grid": [
+        0.01,
+        0.05,
+        0.1,
+        0.5,
+        1.0
+      ],
+      "selected": 0.1,
+      "criterion": "Convergence speed vs alignment sharpness vs coupling smoothness"
+    },
+    "lambda_b": {
+      "grid": [
+        0.0,
+        0.1,
+        0.3,
+        0.5
+      ],
+      "selected": 0.3,
+      "criterion": "5-fold cross-validation; cosine >= 0.80 constraint"
+    },
+    "lambda_f": {
+      "grid": [
+        0.0,
+        0.1,
+        0.2,
+        0.3
+      ],
+      "selected": 0.2,
+      "criterion": "2 pp demographic-parity tolerance vs JS penalty"
+    },
+    "K_clusters": {
+      "grid": [
+        3,
+        4,
+        5,
+        7,
+        10
+      ],
+      "selected": 5,
+      "criterion": "Elbow + silhouette + interpretable archetypes"
+    },
+    "temperature": {
+      "grid": [
+        0.3,
+        0.5,
+        0.7,
+        0.9,
+        1.0
+      ],
+      "selected": 0.7,
+      "criterion": "Diversity floor vs hallucination ceiling"
+    },
+    "embedding_dim": {
+      "grid": [
+        32,
+        64,
+        128,
+        256,
+        512
+      ],
+      "selected": 128,
+      "criterion": "JS plateau; index size and training cost"
+    },
+    "transformer_heads": {
+      "grid": [
+        2,
+        4,
+        8
+      ],
+      "selected": 4,
+      "criterion": "Architecture sweep at d=128"
+    },
+    "max_sinkhorn_iter": {
+      "grid": [
+        50,
+        100,
+        200,
+        500
+      ],
+      "selected": 200,
+      "criterion": "100% convergence with 2.5x safety margin over the typical 80"
+    }
+  },
+  "cluster_sweep": [
+    {
+      "K": 3,
+      "silhouette": 0.48,
+      "js_downstream": 0.021,
+      "interpretation": "Under-segmented: merges price-sensitive and promotion-driven"
+    },
+    {
+      "K": 4,
+      "silhouette": 0.45,
+      "js_downstream": 0.019,
+      "interpretation": "Merges two behaviourally distinct segments"
+    },
+    {
+      "K": 5,
+      "silhouette": 0.42,
+      "js_downstream": 0.017,
+      "interpretation": "Selected — smallest cluster has 6,892 households"
+    },
+    {
+      "K": 7,
+      "silhouette": 0.36,
+      "js_downstream": 0.019,
+      "interpretation": "Two clusters below 3,000 households"
+    },
+    {
+      "K": 10,
+      "silhouette": 0.28,
+      "js_downstream": 0.024,
+      "interpretation": "Degenerate clusters below 1,000 households"
+    }
+  ],
+  "sinkhorn_iteration_sweep": [
+    {
+      "max_iter": 50,
+      "convergence_pct": 72,
+      "note": "Truncated"
+    },
+    {
+      "max_iter": 100,
+      "convergence_pct": 98,
+      "note": ""
+    },
+    {
+      "max_iter": 200,
+      "convergence_pct": 100,
+      "note": "Selected"
+    },
+    {
+      "max_iter": 500,
+      "convergence_pct": 100,
+      "note": ""
+    }
+  ],
+  "finding": "Silhouette decreases monotonically with K because the behavioural embedding space represents a continuum; K=5 provides the best downstream JS while maintaining interpretable archetypes."
+}

@@ -221,7 +221,7 @@ _HISTORY = [
      "1.8%", "$0.35", "40dd7a16"),
 ]
 
-history = st.session_state.get("run_history", [])
+history = demo_engine.ensure_seeded_history()
 history_rows = [{
     "survey_id": (h.get("metadata") or {}).get("survey_id")
                  or theme.run_label(h["run_id"]),
